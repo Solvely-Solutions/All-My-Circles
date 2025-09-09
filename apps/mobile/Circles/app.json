@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "Circles",
+    "slug": "Circles",
+    "version": "1.0.0",
+    "android": {
+      "package": "com.solvely.Circles"
+    },
+    "ios": {
+      "bundleIdentifier": "com.solvely.Circles"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "uid": "card-AllMyCirclesforHubSpot",
+  "type": "card",
+  "config": {
+    "name": "Networking Info",
+    "location": "crm.record.tab",
+    "entrypoint": "/app/cards/NetworkingCard.jsx",
+    "objectTypes": [
+      "contacts"
+    ]
+  }
+}

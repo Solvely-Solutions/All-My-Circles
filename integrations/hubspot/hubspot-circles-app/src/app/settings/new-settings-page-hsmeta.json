@@ -1,0 +1,7 @@
+{
+  "uid": "settings-AllMyCirclesforHubSpot",
+  "type": "settings",
+  "config": {
+    "entrypoint": "/app/settings/CirclesSettings.tsx"
+  }
+}

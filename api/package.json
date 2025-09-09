@@ -1,0 +1,41 @@
+{
+  "name": "circles-api",
+  "version": "1.0.0",
+  "description": "Circles API - HubSpot integration and mobile app backend",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "build": "echo 'No build step required'",
+    "migrate": "supabase db push"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "compression": "^1.7.4",
+    "dotenv": "^16.3.1",
+    "@supabase/supabase-js": "^2.38.0",
+    "@hubspot/api-client": "^10.2.0",
+    "express-rate-limit": "^6.10.0",
+    "express-validator": "^7.0.1",
+    "winston": "^3.10.0",
+    "node-cron": "^3.0.2",
+    "jsonwebtoken": "^9.0.2",
+    "crypto": "^1.0.1",
+    "axios": "^1.5.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "hubspot",
+    "contacts",
+    "networking",
+    "crm",
+    "mobile-app"
+  ],
+  "author": "Solvely",
+  "license": "MIT"
+}

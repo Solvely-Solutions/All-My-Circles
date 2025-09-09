@@ -1,0 +1,663 @@
+import "react-native-reanimated";
+import React, { useMemo, useState } from "react";
+import { SafeAreaView, View, Text, TextInput, ScrollView, Pressable } from "react-native";
+import { MotiView } from "moti";
+import {
+  Plus,
+  Search as SearchIcon,
+  Users,
+  LayoutGrid,
+  Inbox,
+  Star as StarIcon,
+  Tag as TagIcon,
+  Calendar,
+  MapPin,
+  Mail,
+  Phone,
+  ChevronRight,
+  X as XIcon,
+  Check as CheckIcon,
+  Filter as FilterIcon,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react-native";
+
+/**
+ * Circles — Cross‑platform UI (Web + iOS)
+ * - Uses React Native primitives so it runs under Expo on iOS and via RN Web in the browser
+ * - Styling via NativeWind (Tailwind‑like className on RN)
+ * - Animations via Moti (Reanimated)
+ * - Single‑file implementation to match your current repo setup
+ */
+
+// -------------------- Mock Data --------------------
+const MOCK_TAGS = ["rust", "cycling", "coffee", "ai", "design"];
+
+const seedContacts = [
+  {
+    id: "c1",
+    name: "Alex Rivera",
+    identifiers: [
+      { type: "email", value: "alex@trailbrew.com" },
+      { type: "linkedin", value: "linkedin.com/in/alexrivera" },
+    ],
+    company: "Trailbrew",
+    title: "Platform Engineer",
+    city: "Austin",
+    country: "US",
+    groups: ["DevCon 2025", "Austin Trip"],
+    tags: ["rust", "cycling"],
+    note: "Met at booth B12. Bikepacking + distributed systems.",
+    starred: true,
+    lastInteraction: "2025-08-21",
+  },
+  {
+    id: "c2",
+    name: "Bianca Lee",
+    identifiers: [
+      { type: "email", value: "bianca@beanlab.co" },
+      { type: "x", value: "@biancacodes" },
+    ],
+    company: "BeanLab",
+    title: "Founder",
+    city: "San Francisco",
+    country: "US",
+    groups: ["Coffee Expo 2025"],
+    tags: ["coffee", "design"],
+    note: "Espresso geek. Loves visual brand systems.",
+    starred: false,
+    lastInteraction: "2025-08-03",
+  },
+  {
+    id: "c3",
+    name: "Dmitri Pavlov",
+    identifiers: [{ type: "email", value: "d@meshgrid.dev" }],
+    company: "MeshGrid",
+    title: "CTO",
+    city: "Barcelona",
+    country: "ES",
+    groups: ["KubeCon 2025"],
+    tags: ["ai"],
+    note: "Edge inference at the booth. Interested in collab.",
+    starred: false,
+    lastInteraction: "2025-07-29",
+  },
+];
+
+const seedGroups = [
+  {
+    id: "g1",
+    name: "DevCon 2025",
+    type: "event",
+    dates: { start: "2025-06-11", end: "2025-06-14" },
+    location: "Austin, TX",
+    members: ["c1"],
+  },
+  {
+    id: "g2",
+    name: "Austin Trip",
+    type: "trip",
+    dates: { start: "2025-10-01", end: "2025-10-06" },
+    location: "Austin, TX",
+    members: ["c1"],
+  },
+  {
+    id: "g3",
+    name: "Coffee Expo 2025",
+    type: "event",
+    dates: { start: "2025-04-21", end: "2025-04-23" },
+    location: "Portland, OR",
+    members: ["c2"],
+  },
+  {
+    id: "g4",
+    name: "KubeCon 2025",
+    type: "event",
+    dates: { start: "2025-05-18", end: "2025-05-22" },
+    location: "Barcelona, ES",
+    members: ["c3"],
+  },
+];
+
+const seedSuggestions = [
+  {
+    id: "s1",
+    contactId: "c1",
+    field: "title",
+    proposed: "Senior Platform Engineer",
+    confidence: 0.86,
+    source: "linkedin",
+  },
+  {
+    id: "s2",
+    contactId: "c2",
+    field: "company",
+    proposed: "BeanLab Co.",
+    confidence: 0.72,
+    source: "domain",
+  },
+];
+
+// -------------------- Helpers --------------------
+function classNames(...a: Array<string | false | null | undefined>) {
+  return a.filter(Boolean).join(" ");
+}
+
+function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <View
+      className={classNames(
+        "rounded-3xl p-4 md:p-6 shadow-xl",
+        "bg-white/10 backdrop-blur-2xl",
+        "border border-white/20",
+        className
+      )}
+    >
+      {children}
+    </View>
+  );
+}
+
+function Chip({ children, active = false }: { children: React.ReactNode; active?: boolean }) {
+  return (
+    <View className={classNames("px-3 py-1 rounded-full", active ? "bg-white/60" : "bg-white/15 border border-white/20")}> 
+      <Text className={active ? "text-gray-900 text-xs font-medium" : "text-white text-xs font-medium"}>{children}</Text>
+    </View>
+  );
+}
+
+// -------------------- Main App --------------------
+
+type ViewT = "home" | "contacts" | "groups" | "inbox";
+
+export default function App() {
+  const [view, setView] = useState<ViewT>("home");
+  const [query, setQuery] = useState("");
+  const [contacts, setContacts] = useState(seedContacts);
+  const [groups, setGroups] = useState(seedGroups);
+  const [suggestions, setSuggestions] = useState(seedSuggestions);
+  const [showAdd, setShowAdd] = useState(false);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return contacts;
+    return contacts.filter((c) =>
+      [
+        c.name,
+        c.company,
+        c.title,
+        c.city,
+        c.tags.join(" "),
+        c.groups.join(" "),
+        c.identifiers.map((i) => i.value).join(" "),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [contacts, query]);
+
+  const groupMembers = useMemo(() => {
+    if (!activeGroup) return contacts;
+    const g = groups.find((x) => x.name === activeGroup || x.id === activeGroup);
+    if (!g) return contacts;
+    const ids = new Set(g.members);
+    return contacts.filter((c) => ids.has(c.id));
+  }, [activeGroup, groups, contacts]);
+
+  const list = activeGroup ? groupMembers : filtered;
+
+  function toggleStar(id: string) {
+    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, starred: !c.starred } : c)));
+  }
+
+  function addContact(payload: { name: string; identifier: string; note?: string; tags: string[]; groups: string[] }) {
+    const id = `c${Date.now()}`;
+    const identType = payload.identifier.includes("@")
+      ? "email"
+      : payload.identifier.startsWith("+")
+      ? "phone"
+      : "url";
+
+    const newC = {
+      id,
+      name: payload.name,
+      identifiers: [{ type: identType, value: payload.identifier }],
+      company: "",
+      title: "",
+      city: "",
+      country: "",
+      groups: payload.groups,
+      tags: payload.tags,
+      note: payload.note || "",
+      starred: false,
+      lastInteraction: new Date().toISOString().slice(0, 10),
+    } as (typeof seedContacts)[number];
+
+    setContacts((prev) => [newC, ...prev]);
+
+    payload.groups.forEach((gname) => {
+      const g = groups.find((gg) => gg.name === gname);
+      if (!g) {
+        const gid = `g${Date.now()}-${Math.random()}`;
+        const newG = { id: gid, name: gname, type: "custom", location: "", members: [id] } as any;
+        setGroups((prev) => [...prev, newG]);
+      } else if (!g.members.includes(id)) {
+        setGroups((prev) => prev.map((x) => (x.id === g.id ? { ...x, members: [...x.members, id] } : x)));
+      }
+    });
+  }
+
+  function resolveSuggestion(sid: string, action: "accept" | "reject") {
+    const sug = suggestions.find((s) => s.id === sid);
+    if (!sug) return;
+    if (action === "accept") {
+      setContacts((prev) => prev.map((c) => (c.id === sug.contactId ? { ...c, [sug.field]: sug.proposed } : c)));
+    }
+    setSuggestions((prev) => prev.filter((s) => s.id !== sid));
+  }
+
+  return (
+    <SafeAreaView className="flex-1 bg-[#0b1220]">
+      <ScrollView contentContainerStyle={{ padding: 16 }}>
+        {/* Header */}
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center">
+            <View className="h-10 w-10 rounded-2xl bg-white/20 border border-white/25 items-center justify-center mr-3">
+              <Sparkles size={20} color="white" />
+            </View>
+            <View>
+              <Text className="text-white text-xl font-semibold">Circles</Text>
+              <Text className="text-white/70 text-sm -mt-0.5">Group people you meet. Enrich later. Recall fast.</Text>
+            </View>
+          </View>
+
+          <Pressable onPress={() => setShowAdd(true)} className="px-3 py-2 rounded-2xl bg-white/20 border border-white/30">
+            <View className="flex-row items-center">
+              <Plus size={16} color="white" />
+              <Text className="text-white ml-2">Quick Add</Text>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Top Controls */}
+        <View className="mt-4">
+          <GlassCard>
+            <View className="flex-row items-center">
+              <SearchBar value={query} onChange={setQuery} />
+              <Pressable className="ml-2 rounded-2xl px-3 py-2 bg-white/10 border border-white/20">
+                <FilterIcon size={16} color="white" />
+              </Pressable>
+            </View>
+
+            {/* View Switcher */}
+            <View className="flex-row mt-4">
+              <ViewTab icon={<LayoutGrid size={16} color="white" />} label="Home" active={view === "home"} onPress={() => { setView("home"); setActiveGroup(null); }} />
+              <View className="w-2" />
+              <ViewTab icon={<Users size={16} color="white" />} label="Contacts" active={view === "contacts"} onPress={() => { setView("contacts"); setActiveGroup(null); }} />
+              <View className="w-2" />
+              <ViewTab icon={<TagIcon size={16} color="white" />} label="Groups" active={view === "groups"} onPress={() => setView("groups")} />
+              <View className="w-2" />
+              <ViewTab icon={<Inbox size={16} color="white" />} label={`Inbox (${suggestions.length})`} active={view === "inbox"} onPress={() => { setView("inbox"); setActiveGroup(null); }} />
+            </View>
+          </GlassCard>
+
+          <View className="h-3" />
+
+          <GlassCard>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center">
+                <Calendar size={16} color="white" />
+                <Text className="text-white text-sm ml-2">Upcoming</Text>
+              </View>
+            </View>
+            <View className="flex-row flex-wrap mt-3">
+              {groups.slice(0, 3).map((g) => (
+                <Pressable key={g.id} onPress={() => { setActiveGroup(g.name); setView("contacts"); }} className="mr-2 mb-2">
+                  <Chip>{g.name}</Chip>
+                </Pressable>
+              ))}
+            </View>
+          </GlassCard>
+        </View>
+
+        {/* Content */}
+        <View className="mt-4">
+          {view === "home" && (
+            <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }}>
+              <GlassCard>
+                <SectionHeader title="Starred" subtitle="People you want to keep close" />
+                <View className="mt-3">
+                  {contacts.filter((c) => c.starred).length === 0 && (
+                    <EmptyState text="No starred contacts yet" />
+                  )}
+                  {contacts
+                    .filter((c) => c.starred)
+                    .map((c) => (
+                      <View key={c.id} className="mb-3">
+                        <ContactCard c={c} onStar={() => toggleStar(c.id)} />
+                      </View>
+                    ))}
+                </View>
+              </GlassCard>
+
+              <View className="h-3" />
+
+              <GlassCard>
+                <SectionHeader title="Recently added" subtitle="Fresh connections" />
+                <View className="mt-3">
+                  {contacts.slice(0, 4).map((c) => (
+                    <View key={c.id} className="mb-3">
+                      <ContactCard c={c} onStar={() => toggleStar(c.id)} />
+                    </View>
+                  ))}
+                </View>
+              </GlassCard>
+            </MotiView>
+          )}
+
+          {view === "contacts" && (
+            <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }}>
+              <GlassCard>
+                <SectionHeader title={activeGroup ? `Contacts — ${activeGroup}` : "All contacts"} subtitle={`${list.length} result${list.length !== 1 ? "s" : ""}`} />
+                <View className="mt-3">
+                  {list.length === 0 && <EmptyState text="No contacts match your search" />}
+                  {list.map((c) => (
+                    <View key={c.id} className="mb-3">
+                      <ContactCard c={c} onStar={() => toggleStar(c.id)} />
+                    </View>
+                  ))}
+                </View>
+              </GlassCard>
+            </MotiView>
+          )}
+
+          {view === "groups" && (
+            <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }}>
+              <GlassCard>
+                <SectionHeader title="Groups" subtitle="Events, trips, and custom clusters" />
+                <View className="mt-3">
+                  {groups.map((g) => (
+                    <View key={g.id} className="mb-3">
+                      <GroupCard g={g} onOpen={() => { setActiveGroup(g.name); setView("contacts"); }} />
+                    </View>
+                  ))}
+                </View>
+              </GlassCard>
+            </MotiView>
+          )}
+
+          {view === "inbox" && (
+            <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }}>
+              <GlassCard>
+                <SectionHeader title="Enrichment Inbox" subtitle="Approve suggested updates" />
+                <View className="mt-3">
+                  {suggestions.length === 0 && <EmptyState text="You're all caught up" />}
+                  {suggestions.map((s) => (
+                    <View key={s.id} className="mb-3">
+                      <SuggestionCard s={s} contact={contacts.find((c) => c.id === s.contactId)!} onAccept={() => resolveSuggestion(s.id, "accept")} onReject={() => resolveSuggestion(s.id, "reject")} />
+                    </View>
+                  ))}
+                </View>
+              </GlassCard>
+            </MotiView>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Quick Add Modal (simple overlay) */}
+      {showAdd && (
+        <View className="absolute inset-0 z-50 items-center justify-center bg-black/40">
+          <View className="w-11/12 max-w-[640px]">
+            <GlassCard className="p-6">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-white text-lg font-semibold">Quick Add</Text>
+                <Pressable onPress={() => setShowAdd(false)} className="p-1 rounded-xl bg-white/10 border border-white/20">
+                  <XIcon size={16} color="white" />
+                </Pressable>
+              </View>
+              <View className="mt-3">
+                <QuickAddForm
+                  onCancel={() => setShowAdd(false)}
+                  onSave={(data) => {
+                    addContact(data);
+                    setShowAdd(false);
+                  }}
+                />
+              </View>
+            </GlassCard>
+          </View>
+        </View>
+      )}
+    </SafeAreaView>
+  );
+}
+
+// -------------------- Components --------------------
+function ViewTab({ icon, label, active, onPress }: { icon: React.ReactNode; label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} className={classNames("px-3 py-1.5 rounded-2xl border", active ? "bg-white/60 border-white/60" : "bg-white/10 border-white/20")}> 
+      <View className="flex-row items-center">
+        {icon}
+        <Text className={active ? "text-gray-900 text-sm ml-2" : "text-white text-sm ml-2"}>{label}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <View className="flex-row items-end justify-between">
+      <View>
+        <Text className="text-white text-lg font-semibold">{title}</Text>
+        {!!subtitle && <Text className="text-white/70 text-sm">{subtitle}</Text>}
+      </View>
+    </View>
+  );
+}
+
+function ContactCard({ c, onStar }: { c: typeof seedContacts[number]; onStar: () => void }) {
+  return (
+    <GlassCard className="p-4">
+      <View className="flex-row justify-between">
+        <View className="flex-1 pr-3">
+          <View className="flex-row items-center">
+            <Text className="text-white font-medium">{c.name}</Text>
+            {c.starred && <StarIcon size={14} color="white" fill="white" style={{ marginLeft: 6 }} />}
+          </View>
+          <Text className="text-white/80 text-sm">{c.title || "—"}{c.company ? ` · ${c.company}` : ""}</Text>
+          <View className="flex-row flex-wrap mt-2">
+            {c.tags.map((t) => (
+              <View key={t} className="mr-2 mb-2">
+                <Chip>{t}</Chip>
+              </View>
+            ))}
+            {!!c.city && (
+              <View className="mr-2 mb-2 px-3 py-1 rounded-full bg-white/15 border border-white/20 flex-row items-center">
+                <MapPin size={12} color="white" />
+                <Text className="text-white text-xs ml-1">{c.city}</Text>
+              </View>
+            )}
+          </View>
+          {!!c.note && <Text className="text-white/70 text-sm mt-2">{c.note}</Text>}
+          <View className="flex-row items-center mt-3">
+            {c.identifiers[0]?.type === "email" && (
+              <View className="flex-row items-center">
+                <Mail size={12} color="white" />
+                <Text className="text-white/80 text-xs ml-1">{c.identifiers[0].value}</Text>
+              </View>
+            )}
+            {c.identifiers[0]?.type === "phone" && (
+              <View className="flex-row items-center">
+                <Phone size={12} color="white" />
+                <Text className="text-white/80 text-xs ml-1">{c.identifiers[0].value}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        <View className="items-end">
+          <Pressable onPress={onStar} className="p-2 rounded-2xl bg-white/10 border border-white/20 mb-2">
+            <StarIcon size={14} color="white" fill={c.starred ? "white" : undefined} />
+          </Pressable>
+          <Pressable className="p-2 rounded-2xl bg-white/10 border border-white/20">
+            <ArrowRight size={14} color="white" />
+          </Pressable>
+        </View>
+      </View>
+    </GlassCard>
+  );
+}
+
+function GroupCard({ g, onOpen }: { g: typeof seedGroups[number]; onOpen: () => void }) {
+  return (
+    <GlassCard className="p-4">
+      <View className="flex-row items-center justify-between">
+        <View>
+          <Text className="text-white font-medium">{g.name}</Text>
+          <Text className="text-white/80 text-sm capitalize">{g.type} • {g.location || ""}</Text>
+        </View>
+        <Pressable onPress={onOpen} className="p-2 rounded-2xl bg-white/10 border border-white/20">
+          <ChevronRight size={16} color="white" />
+        </Pressable>
+      </View>
+      <View className="flex-row items-center mt-3">
+        <Users size={16} color="white" />
+        <Text className="text-white/80 text-sm ml-2">{g.members.length} member{g.members.length !== 1 ? "s" : ""}</Text>
+      </View>
+    </GlassCard>
+  );
+}
+
+function SuggestionCard({ s, contact, onAccept, onReject }: { s: typeof seedSuggestions[number]; contact: typeof seedContacts[number]; onAccept: () => void; onReject: () => void }) {
+  return (
+    <GlassCard className="p-4">
+      <View className="flex-row justify-between">
+        <View className="pr-3">
+          <View className="flex-row items-center">
+            <Text className="text-white font-medium">{contact.name}</Text>
+            <Text className="text-white/70 text-xs ml-2">({s.source})</Text>
+          </View>
+          <Text className="text-white text-sm mt-1">
+            Propose <Text className="text-white/80">{s.field}</Text> → <Text className="font-medium text-white">{s.proposed}</Text>
+          </Text>
+          <Text className="text-white/70 text-xs mt-2">Confidence: {(s.confidence * 100).toFixed(0)}%</Text>
+        </View>
+        <View className="flex-row items-center">
+          <Pressable onPress={onReject} className="p-2 mr-2 rounded-2xl bg-white/10 border border-white/20">
+            <XIcon size={16} color="white" />
+          </Pressable>
+          <Pressable onPress={onAccept} className="p-2 rounded-2xl bg-white/10 border border-white/20">
+            <CheckIcon size={16} color="white" />
+          </Pressable>
+        </View>
+      </View>
+    </GlassCard>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <View className="rounded-3xl border border-white/20 bg-white/5 p-8 items-center justify-center">
+      <Text className="text-white/70">{text}</Text>
+    </View>
+  );
+}
+
+function SearchBar({ value, onChange }: { value: string; onChange: (s: string) => void }) {
+  return (
+    <View className="flex-1 flex-row items-center rounded-2xl bg-white/10 border border-white/20 px-3 py-2">
+      <SearchIcon size={16} color="rgba(255,255,255,0.7)" />
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder="Search by name, tag, city, company, group…"
+        placeholderTextColor="rgba(255,255,255,0.6)"
+        className="flex-1 text-white ml-2"
+      />
+    </View>
+  );
+}
+
+function QuickAddForm({ onCancel, onSave }: { onCancel: () => void; onSave: (data: { name: string; identifier: string; note?: string; tags: string[]; groups: string[] }) => void }) {
+  const [name, setName] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [note, setNote] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [groupInput, setGroupInput] = useState("");
+  const [groups, setGroups] = useState<string[]>([]);
+
+  function toggleTag(t: string) {
+    setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  }
+
+  function addGroupChip() {
+    const g = groupInput.trim();
+    if (!g) return;
+    if (!groups.includes(g)) setGroups((prev) => [...prev, g]);
+    setGroupInput("");
+  }
+
+  return (
+    <View>
+      <View className="mb-3">
+        <Text className="text-white/80 text-sm">Name</Text>
+        <TextInput value={name} onChangeText={setName} placeholder="Jane Smith" placeholderTextColor="rgba(255,255,255,0.6)" className="rounded-2xl px-3 py-2 bg-white/10 border border-white/20 text-white mt-1" />
+      </View>
+
+      <View className="mb-3">
+        <Text className="text-white/80 text-sm">Email / Phone / URL</Text>
+        <TextInput value={identifier} onChangeText={setIdentifier} placeholder="jane@company.com" placeholderTextColor="rgba(255,255,255,0.6)" className="rounded-2xl px-3 py-2 bg-white/10 border border-white/20 text-white mt-1" />
+      </View>
+
+      <View className="mb-3">
+        <Text className="text-white/80 text-sm">Note</Text>
+        <TextInput value={note} onChangeText={setNote} placeholder="Met at booth…" placeholderTextColor="rgba(255,255,255,0.6)" className="rounded-2xl px-3 py-2 bg-white/10 border border-white/20 text-white mt-1 min-h-[80px]" multiline numberOfLines={4} />
+      </View>
+
+      <View className="mb-3">
+        <Text className="text-white/80 text-sm">Tags</Text>
+        <View className="flex-row flex-wrap mt-2">
+          {MOCK_TAGS.map((t) => (
+            <Pressable key={t} onPress={() => toggleTag(t)} className="mr-2 mb-2">
+              <Chip active={tags.includes(t)}>{t}</Chip>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View className="mb-3">
+        <Text className="text-white/80 text-sm">Groups</Text>
+        <View className="flex-row items-center mt-2">
+          <TextInput value={groupInput} onChangeText={setGroupInput} placeholder="e.g., DevCon 2026" placeholderTextColor="rgba(255,255,255,0.6)" className="flex-1 rounded-2xl px-3 py-2 bg-white/10 border border-white/20 text-white" />
+          <Pressable onPress={addGroupChip} className="ml-2 rounded-2xl px-3 py-2 bg-white/10 border border-white/20">
+            <Text className="text-white">Add</Text>
+          </Pressable>
+        </View>
+        <View className="flex-row flex-wrap mt-2">
+          {groups.map((g) => (
+            <View key={g} className="mr-2 mb-2">
+              <Chip active>{g}</Chip>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View className="flex-row justify-end mt-2">
+        <Pressable onPress={onCancel} className="px-4 py-2 rounded-2xl bg-white/10 border border-white/20 mr-2">
+          <Text className="text-white">Cancel</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            if (!name || !identifier) return;
+            onSave({ name, identifier, note, tags, groups });
+          }}
+          className="px-4 py-2 rounded-2xl bg-white/60"
+        >
+          <Text className="text-gray-900">Save</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}

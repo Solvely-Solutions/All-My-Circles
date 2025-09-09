@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.expo/
+dist/
+build/
+web-build/
+
+# Config files
+metro.config.js
+babel.config.js
+*.config.js
+.eslintrc.js
+
+# Generated files
+*.d.ts
+!src/**/*.d.ts
+
+# Logs
+*.log
