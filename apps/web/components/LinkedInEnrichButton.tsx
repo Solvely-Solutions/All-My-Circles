@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { enrichContactWithLinkedIn, LinkedInEnrichmentResponse } from '../../packages/shared/linkedin-webhook';
+import { enrichContactWithLinkedIn, LinkedInEnrichmentResponse } from '../lib/shared/linkedin-webhook';
 
 interface LinkedInEnrichButtonProps {
   email: string;
