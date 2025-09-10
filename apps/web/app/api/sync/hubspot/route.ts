@@ -139,7 +139,8 @@ export async function POST(request: NextRequest) {
               } else {
                 // Create new contact
                 const hubspotResponse = await hubspotClient.crm.contacts.basicApi.create({
-                  properties: hubspotProperties
+                  properties: hubspotProperties,
+                  associations: []
                 });
                 
                 await supabase
