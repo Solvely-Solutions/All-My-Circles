@@ -1,0 +1,34 @@
+{
+  "name": "all-my-circles-monorepo",
+  "version": "1.0.0",
+  "description": "All My Circles - Contact Management and HubSpot Integration",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "api"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=apps/web",
+    "start": "npm run start --workspace=apps/web",
+    "api:dev": "npm run dev --workspace=api",
+    "api:start": "npm run start --workspace=api",
+    "hubspot:upload": "cd integrations/hubspot/hubspot-circles-app && hs project upload",
+    "setup:properties": "npm run setup:properties --workspace=apps/web"
+  },
+  "keywords": [
+    "hubspot",
+    "crm",
+    "contacts",
+    "networking",
+    "mobile-app",
+    "all-my-circles"
+  ],
+  "author": "Solvely Solutions",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Solvely-Solutions/All-My-Circles.git"
+  }
+}
