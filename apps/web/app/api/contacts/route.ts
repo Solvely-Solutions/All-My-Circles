@@ -176,7 +176,8 @@ export async function POST(request: NextRequest) {
             amc_next_followup_date: contactData.next_followup_date,
             amc_total_interactions: contactData.total_interactions?.toString(),
             amc_contact_id: contact.id,
-          }
+          },
+          associations: []
         };
 
         const hubspotResponse = await hubspotClient.crm.contacts.basicApi.create(hubspotContact);
