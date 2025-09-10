@@ -107,7 +107,7 @@ app.use('/api/events', eventsRoutes);
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'Circles API - HubSpot Integration Backend',
+    message: 'All My Circles API - HubSpot Integration Backend',
     version: '1.0.0',
     documentation: 'https://docs.solvely.com/circles/api',
     health: '/health'
@@ -140,7 +140,7 @@ process.on('SIGINT', () => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Circles API server running on port ${PORT}`);
+  console.log(`🚀 All My Circles API server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
   

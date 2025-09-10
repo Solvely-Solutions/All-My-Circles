@@ -1,7 +1,7 @@
 {
-  "name": "circles-api",
+  "name": "all-my-circles-api",
   "version": "1.0.0",
-  "description": "Circles API - HubSpot integration and mobile app backend",
+  "description": "All My Circles API - HubSpot integration and mobile app backend",
   "main": "index.js",
   "type": "module",
   "scripts": {

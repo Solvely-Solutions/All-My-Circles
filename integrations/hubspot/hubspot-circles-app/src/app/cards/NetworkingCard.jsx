@@ -179,7 +179,7 @@ const NetworkingCard = ({ objectId, objectType }) => {
         >
           <Text>This contact hasn't been synced from your All My Circles mobile app yet.</Text>
           <Text variant="micro" format={{ color: 'secondary' }}>
-            To see networking context, connection history, and relationship insights, sync this contact from your mobile app.
+            To see networking context, connection history, and relationship insights, sync this contact from your All My Circles mobile app.
           </Text>
           <Flex gap="xs" justify="center" wrap="wrap">
             <Button variant="primary" onClick={() => console.log('Import clicked for contact:', objectId)}>
@@ -197,7 +197,7 @@ const NetworkingCard = ({ objectId, objectType }) => {
   return (
     <Flex direction="column" gap="medium">
       <Flex justify="between" align="center">
-        <Heading>Networking Profile</Heading>
+        <Heading>All My Circles - Networking Profile</Heading>
         <Button variant="secondary" size="xs" onClick={fetchNetworkingData}>
           Refresh
         </Button>
