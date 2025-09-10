@@ -1,11 +1,30 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Client } from '@hubspot/api-client';
 
-export const supabase = createClient(
-  process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
-  process.env.SUPABASE_SERVICE_KEY || 'placeholder-key'
-);
+let _supabase: SupabaseClient | null = null;
+
+function getSupabaseClient(): SupabaseClient {
+  if (!_supabase) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration missing. Please set SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables.');
+    }
+    
+    _supabase = createClient(supabaseUrl, supabaseKey);
+  }
+  return _supabase;
+}
+
+export const supabase = new Proxy({} as SupabaseClient, {
+  get: (target, prop) => {
+    const client = getSupabaseClient();
+    const value = (client as any)[prop];
+    return typeof value === 'function' ? value.bind(client) : value;
+  }
+});
 
 export interface Organization {
   id: string;

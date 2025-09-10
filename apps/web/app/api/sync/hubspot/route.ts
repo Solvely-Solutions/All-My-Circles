@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client } from '@hubspot/api-client';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
+import { supabase } from '../../../../lib/api-utils';
 
 async function getOrganizationFromRequest(request: NextRequest) {
   const authHeader = request.headers.get('authorization');

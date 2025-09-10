@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client } from '@hubspot/api-client';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../../../../lib/api-utils';
 
 const hubspotClient = new Client({ accessToken: '' });
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;

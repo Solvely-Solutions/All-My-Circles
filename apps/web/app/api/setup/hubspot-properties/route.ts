@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth, createApiResponse, createErrorResponse, supabase } from '@/lib/api-utils';
-import { setupHubSpotProperties } from '@/scripts/setup-hubspot-properties';
+import { withAuth, createApiResponse, createErrorResponse, supabase } from '../../../../lib/api-utils';
+import { setupHubSpotProperties } from '../../../../scripts/setup-hubspot-properties';
 
 // POST /api/setup/hubspot-properties - Create custom properties in HubSpot
 export async function POST(request: NextRequest) {
