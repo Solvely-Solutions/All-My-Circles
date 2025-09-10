@@ -1,0 +1,78 @@
+# Dependencies
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# Build outputs
+.next/
+*/.next/
+**/.next/
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Claude
+.claude/
+
+# Mobile specific
+apps/mobile/ios/build/
+apps/mobile/android/build/
+apps/mobile/android/app/build/
+
+# HubSpot CLI
+integrations/hubspot/hubspot-circles-app/.hsappinfo.json
+integrations/hubspot/hubspot-circles-app/dist/
+
+# API specific
+api/node_modules/
+
+# Documentation (keep small docs, exclude large ones)
+docs/assets/
+docs/screenshots/
+
+# Temporary files
+*.tmp
+*.temp

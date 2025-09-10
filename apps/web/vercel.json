@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "app/api/**": {
+      "maxDuration": 30
+    }
+  },
+  "redirects": [
+    {
+      "source": "/oauth-callback",
+      "destination": "/api/hubspot/oauth-callback",
+      "permanent": false
+    }
+  ]
+}
