@@ -31,91 +31,43 @@ const NetworkingCard = ({ objectId, objectType }) => {
       setLoading(true);
       setError(null);
 
-      // TODO: Replace with actual API call to fetch networking data
-      // This would integrate with the mobile app's API to get real networking data
-      // Example API call structure:
-      // const response = await hubspot.fetch(`https://api.solvely.com/circles/contacts/${objectId}/networking`);
-      // const networkingData = await response.json();
+      // Fetch real networking data from API
+      const response = await hubspot.fetch(
+        `https://all-my-circles-web-ltp4.vercel.app/api/hubspot/contact-networking?contact_id=${objectId}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
 
-      // Enhanced mock data with more realistic networking scenarios
-      const mockNetworkingScenarios = [
-        {
-          connectionStrength: 'Strong',
-          lastInteraction: '2024-09-07',
-          networkingSource: 'TechCrunch Disrupt 2024',
-          tags: ['Conference', 'Startup', 'AI', 'Venture Capital', 'Hot Lead'],
-          meetingHistory: [
-            {
-              date: '2024-09-07',
-              event: 'TechCrunch Disrupt 2024',
-              notes: 'CEO of AI startup, very interested in our networking solution. Asked for demo next week.',
-              location: 'San Francisco, CA'
-            },
-            {
-              date: '2024-08-15',
-              event: 'SF Tech Meetup',
-              notes: 'Initial connection, discussed AI trends and networking challenges',
-              location: 'San Francisco, CA'
-            }
-          ],
-          totalInteractions: 2,
-          nextFollowUp: '2024-09-14',
-          contactValue: 'High'
-        },
-        {
-          connectionStrength: 'Medium',
-          lastInteraction: '2024-09-05',
-          networkingSource: 'DevCon 2024',
-          tags: ['Conference', 'Tech', 'JavaScript', 'Networking', 'Developer'],
-          meetingHistory: [
-            {
-              date: '2024-09-05',
-              event: 'DevCon 2024',
-              notes: 'Met at the React Native workshop, exchanged ideas about mobile development',
-              location: 'Austin, TX'
-            },
-            {
-              date: '2024-06-15',
-              event: 'Tech Meetup SF',
-              notes: 'Coffee chat about mobile development trends',
-              location: 'San Francisco, CA'
-            }
-          ],
-          totalInteractions: 3,
-          nextFollowUp: '2024-09-20',
-          contactValue: 'Medium'
-        },
-        {
-          connectionStrength: 'Weak',
-          lastInteraction: '2024-08-20',
-          networkingSource: 'LinkedIn Event',
-          tags: ['Online', 'Remote', 'Consulting', 'Follow-up Needed'],
-          meetingHistory: [
-            {
-              date: '2024-08-20',
-              event: 'LinkedIn Live: Future of Work',
-              notes: 'Brief interaction during Q&A session, mentioned interest in networking tools',
-              location: 'Virtual'
-            }
-          ],
-          totalInteractions: 1,
-          nextFollowUp: '2024-09-10',
-          contactValue: 'Low'
-        }
-      ];
-
-      // Randomly select a scenario for demo purposes
-      const randomScenario = mockNetworkingScenarios[Math.floor(Math.random() * mockNetworkingScenarios.length)];
-
-      // Simulate API delay
-      setTimeout(() => {
-        setNetworkingData(randomScenario);
+      const apiResponse = await response.json();
+      
+      if (!apiResponse.hasData) {
+        setNetworkingData(null);
         setLoading(false);
-      }, 800);
+        return;
+      }
+
+      // Transform API response to component data format
+      const transformedData = {
+        connectionStrength: apiResponse.connectionStrength,
+        lastInteraction: apiResponse.lastInteractionDate,
+        networkingSource: apiResponse.firstMetLocation || 'Unknown source',
+        tags: apiResponse.tags || [],
+        meetingHistory: apiResponse.meetingHistory || [],
+        totalInteractions: apiResponse.totalInteractions || 0,
+        nextFollowUp: apiResponse.nextFollowUpDate,
+        contactValue: apiResponse.contactValue,
+        contact: apiResponse.contact,
+        lastSyncedAt: apiResponse.lastSyncedAt
+      };
+
+      setNetworkingData(transformedData);
+      setLoading(false);
 
     } catch (err) {
       console.error('Error fetching networking data:', err);
-      setError('Failed to load networking information');
+      setError(`Failed to load networking information: ${err.message}`);
       setLoading(false);
     }
   };

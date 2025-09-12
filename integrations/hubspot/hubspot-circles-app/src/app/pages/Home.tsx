@@ -36,62 +36,25 @@ const AllMyCirclesHomePage = ({ context }) => {
       setLoading(true);
       setError(null);
 
-      // TODO: Replace with actual API calls to fetch dashboard data
-      // This would integrate with both HubSpot API and mobile app API
-      const mockStats = {
-        totalContacts: 1247,
-        syncedContacts: 892,
-        pendingSync: 23,
-        totalEvents: 15,
-        strongConnections: 156,
-        mediumConnections: 423,
-        weakConnections: 313,
-        lastSyncTime: new Date(Date.now() - 3600000), // 1 hour ago
-        syncProgress: 71.6
-      };
+      // Fetch real dashboard data from API
+      const response = await hubspot.fetch(
+        `https://all-my-circles-web-ltp4.vercel.app/api/hubspot/dashboard`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
 
-      const mockActivity = [
-        {
-          id: 1,
-          type: 'contact_synced',
-          message: 'Synced 12 new contacts from TechCrunch Disrupt 2024',
-          timestamp: new Date(Date.now() - 900000), // 15 minutes ago
-          icon: '👥'
-        },
-        {
-          id: 2,
-          type: 'follow_up_due',
-          message: '3 high-value contacts are due for follow-up',
-          timestamp: new Date(Date.now() - 1800000), // 30 minutes ago
-          icon: '⏰'
-        },
-        {
-          id: 3,
-          type: 'deal_created',
-          message: 'Deal created for Sarah Chen - $50k potential',
-          timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-          icon: '💰'
-        },
-        {
-          id: 4,
-          type: 'event_added',
-          message: 'New event added: Y Combinator Demo Day',
-          timestamp: new Date(Date.now() - 7200000), // 2 hours ago
-          icon: '🎯'
-        }
-      ];
-
-      // Simulate API delay
-      setTimeout(() => {
-        setSyncStats(mockStats);
-        setRecentActivity(mockActivity);
-        setConnectionStatus('connected');
-        setLoading(false);
-      }, 1000);
+      const dashboardData = await response.json();
+      
+      setSyncStats(dashboardData.syncStats);
+      setRecentActivity(dashboardData.recentActivity);
+      setConnectionStatus(dashboardData.connectionStatus);
+      setLoading(false);
 
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      setError('Failed to load dashboard information');
+      setError(`Failed to load dashboard information: ${err.message}`);
       setLoading(false);
     }
   };
@@ -115,17 +78,42 @@ const AllMyCirclesHomePage = ({ context }) => {
     }
   };
 
-  const handleManualSync = () => {
-    console.log('Manual sync triggered');
-    setConnectionStatus('syncing');
-    setTimeout(() => {
+  const handleManualSync = async () => {
+    try {
+      console.log('Manual sync triggered');
+      setConnectionStatus('syncing');
+
+      const response = await hubspot.fetch(
+        `https://all-my-circles-web-ltp4.vercel.app/api/sync/hubspot`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            direction: 'bidirectional',
+            dryRun: false
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Sync failed: ${response.status}`);
+      }
+
+      const syncResult = await response.json();
+      console.log('Sync completed:', syncResult);
+
       setConnectionStatus('connected');
-      setSyncStats(prev => ({
-        ...prev,
-        lastSyncTime: new Date(),
-        pendingSync: 0
-      }));
-    }, 3000);
+      
+      // Refresh dashboard data to show updated stats
+      await fetchDashboardData();
+
+    } catch (err) {
+      console.error('Manual sync error:', err);
+      setConnectionStatus('error');
+      setError(`Sync failed: ${err.message}`);
+    }
   };
 
   const handleExportData = () => {
