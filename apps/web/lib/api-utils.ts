@@ -60,19 +60,24 @@ export async function getAuthContext(request: NextRequest): Promise<AuthContext>
   let user: any = null;
 
   if (deviceId) {
-    // Mobile app authentication
-    const { data: userData, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('mobile_device_id', deviceId)
+    // Mobile app authentication via sessions
+    const { data: sessionData, error } = await supabase
+      .from('user_sessions')
+      .select(`
+        user_id,
+        users!inner(*)
+      `)
+      .eq('device_id', deviceId)
+      .eq('is_active', true)
+      .gt('expires_at', new Date().toISOString())
       .single();
-    
-    if (error || !userData) {
+
+    if (error || !sessionData) {
       throw new Error('Device not authorized');
     }
-    
-    user = userData;
-    organizationId = userData.organization_id;
+
+    user = sessionData.users;
+    organizationId = user.organization_id;
   } else if (portalId) {
     // Web authentication
     const { data: org, error } = await supabase
