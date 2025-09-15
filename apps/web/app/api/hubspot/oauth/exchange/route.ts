@@ -75,7 +75,8 @@ export async function POST(request: NextRequest) {
       .from('users')
       .select('id, organization_id')
       .eq('mobile_device_id', deviceId)
-      .single();
+      .limit(1)
+      .maybeSingle();
 
     if (userError || !userData) {
       return NextResponse.json(
