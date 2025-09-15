@@ -127,11 +127,11 @@ export async function GET(request: NextRequest) {
 
     } catch (error) {
       console.error('Contact networking API error:', error);
-      
-      if (error.code === 404) {
+
+      if ((error as any)?.code === 404) {
         return createErrorResponse('Contact not found in HubSpot', 404);
       }
-      
+
       return createErrorResponse(
         error instanceof Error ? error.message : 'Failed to fetch contact networking data',
         500
@@ -206,11 +206,11 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
       console.error('Update contact networking API error:', error);
-      
-      if (error.code === 404) {
+
+      if ((error as any)?.code === 404) {
         return createErrorResponse('Contact not found in HubSpot', 404);
       }
-      
+
       return createErrorResponse(
         error instanceof Error ? error.message : 'Failed to update contact networking data',
         500

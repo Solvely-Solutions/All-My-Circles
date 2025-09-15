@@ -9,20 +9,32 @@ export interface ContactIdentifier {
 
 export interface Contact {
   id: string;
-  name: string;
-  identifiers: ContactIdentifier[];
+  firstName: string;
+  lastName: string;
+  name?: string; // computed from firstName + lastName for backward compatibility
+  email?: string;
+  phone?: string;
+  identifiers?: ContactIdentifier[];
   company?: string;
-  title?: string;
+  jobTitle?: string;
+  title?: string; // alias for jobTitle for backward compatibility
   city?: string;
   country?: string;
-  groups: string[];
+  connectionStrength?: 'Strong' | 'Medium' | 'Weak';
+  contactValue?: 'High' | 'Medium' | 'Low';
+  firstMetLocation?: string;
+  firstMetDate?: string;
+  nextFollowupDate?: string;
+  groups?: string[];
   tags: string[];
-  note?: string;
-  starred: boolean;
-  lastInteraction: number; // timestamp in milliseconds
+  notes?: string;
+  note?: string; // alias for notes for backward compatibility
+  starred?: boolean;
+  lastInteraction?: number; // timestamp in milliseconds
   imageUri?: string;
   createdAt?: string;
   updatedAt?: string;
+  hubspotContactId?: string;
 }
 
 export interface ContactGroup {

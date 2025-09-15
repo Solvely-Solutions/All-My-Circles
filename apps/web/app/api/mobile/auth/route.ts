@@ -5,7 +5,7 @@ import { randomBytes } from 'crypto';
 // POST /api/mobile/auth - Register/authenticate mobile device
 export async function POST(request: NextRequest) {
   try {
-    const { email, deviceId, deviceInfo } = await request.json();
+    const { email, deviceId, deviceInfo, firstName, lastName } = await request.json();
 
     if (!email || !deviceId) {
       return createErrorResponse('Email and device ID are required', 400);
@@ -25,13 +25,7 @@ export async function POST(request: NextRequest) {
       const { data: newOrg, error: orgError } = await supabase
         .from('organizations')
         .insert({
-          name: `${email.split('@')[0]}'s Organization`,
-          plan: 'free',
-          settings: {
-            sync_enabled: true,
-            auto_sync_interval: 3600, // 1 hour
-            privacy_mode: false
-          }
+          name: `${email.split('@')[0]}'s Organization`
         })
         .select()
         .single();
@@ -48,11 +42,7 @@ export async function POST(request: NextRequest) {
         .from('users')
         .insert({
           email,
-          organization_id: organization.id,
-          mobile_device_id: deviceId,
-          device_info: deviceInfo,
-          role: 'owner',
-          is_active: true
+          organization_id: organization.id
         })
         .select()
         .single();
@@ -68,9 +58,7 @@ export async function POST(request: NextRequest) {
       const { data: updatedUser, error: updateError } = await supabase
         .from('users')
         .update({
-          mobile_device_id: deviceId,
-          device_info: deviceInfo,
-          last_active_at: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
         .eq('id', existingUser.id)
         .select()
@@ -111,22 +99,18 @@ export async function POST(request: NextRequest) {
       user: {
         id: existingUser.id,
         email: existingUser.email,
-        organizationId: existingUser.organization_id,
-        role: existingUser.role,
-        isActive: existingUser.is_active
+        organizationId: existingUser.organization_id
       },
       organization: {
         id: organization.id,
-        name: organization.name,
-        plan: organization.plan,
-        settings: organization.settings
+        name: organization.name
       },
       authentication: {
         deviceId,
         sessionToken,
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       }
-    }, { status: 201 });
+    }, 201);
 
   } catch (error) {
     console.error('Mobile auth error:', error);

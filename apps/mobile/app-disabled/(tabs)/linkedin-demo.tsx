@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { SafeAreaView, View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import LinkedInEnrichButton from '../../components/LinkedInEnrichButton';
 import { GlassCard } from '../../components/ui/GlassCard';
 
 export default function LinkedInDemoScreen() {
@@ -52,13 +51,6 @@ export default function LinkedInDemoScreen() {
                 />
               </View>
 
-              {/* LinkedIn Enrich Button */}
-              <LinkedInEnrichButton
-                email={email}
-                onEnrichmentComplete={(result) => {
-                  console.log('LinkedIn enrichment result:', result);
-                }}
-              />
 
               {/* Info */}
               <View className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4">

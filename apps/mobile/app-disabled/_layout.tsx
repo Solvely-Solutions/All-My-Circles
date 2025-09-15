@@ -9,7 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
-import AuthScreen from '../components/AuthScreen';
+import AuthScreen from '../components/auth/AuthScreen';
 import { ActivityIndicator, View } from 'react-native';
 
 function AppContent() {

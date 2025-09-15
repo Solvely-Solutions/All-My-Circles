@@ -8,8 +8,6 @@
     "auth": {
       "type": "oauth",
       "redirectUrls": [
-        "http://localhost:3000/oauth-callback",
-        "https://api.solvely.com/hubspot/oauth-callback",
         "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/oauth-callback"
       ],
       "requiredScopes": [

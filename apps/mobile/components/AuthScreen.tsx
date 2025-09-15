@@ -10,9 +10,10 @@ import {
   Platform,
   ActivityIndicator 
 } from 'react-native';
-import { Circle, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { Circle, Mail, Lock, Eye, EyeOff, User } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { devError } from '../utils/config';
+import { apiService } from '../services/apiService';
 
 function CirclesLogo({ size = 32, color = "white" }) {
   const multiplier = size / 200; // Base size ratio from the large version
@@ -103,8 +104,12 @@ function CirclesLogo({ size = 32, color = "white" }) {
 export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn, isLoading } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const { signIn, signUp, isLoading } = useAuth();
 
   const handleSignIn = async () => {
     if (!email.trim() || !password.trim()) return;
@@ -117,6 +122,26 @@ export default function AuthScreen() {
     }
   };
 
+  const handleSignUp = async () => {
+    if (!email.trim() || !password.trim() || !firstName.trim() || !lastName.trim()) return;
+    
+    setIsRegistering(true);
+    try {
+      const deviceInfo = {
+        platform: Platform.OS,
+        model: 'Unknown', // Simplified since we removed expo-device
+        osVersion: Platform.Version?.toString() || 'Unknown'
+      };
+      
+      // Use our updated AuthContext signUp function with mock deviceId
+      await signUp(email.trim(), firstName.trim(), lastName.trim());
+    } catch (error) {
+      devError('Sign up error', error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
   const handleDemoLogin = () => {
     setEmail('demo@circles.app');
     setPassword('demo123');
@@ -124,7 +149,7 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
@@ -138,11 +163,50 @@ export default function AuthScreen() {
             <Text style={styles.subtitle}>Connect. Network. Convert.</Text>
           </View>
 
-          {/* Login Form */}
+          {/* Login/Signup Form */}
           <View style={styles.formContainer}>
             <View style={styles.glassCard}>
-              <Text style={styles.formTitle}>Welcome back</Text>
-              <Text style={styles.formSubtitle}>Sign in to access your contacts</Text>
+              <Text style={styles.formTitle}>
+                {isSignUp ? 'Create Account' : 'Welcome back'}
+              </Text>
+              <Text style={styles.formSubtitle}>
+                {isSignUp ? 'Join All My Circles' : 'Sign in to access your contacts'}
+              </Text>
+
+              {/* Name inputs for signup */}
+              {isSignUp && (
+                <>
+                  <View style={styles.inputGroup}>
+                    <View style={styles.inputContainer}>
+                      <User size={18} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="First Name"
+                        placeholderTextColor="rgba(255,255,255,0.5)"
+                        value={firstName}
+                        onChangeText={setFirstName}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <View style={styles.inputContainer}>
+                      <User size={18} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Last Name"
+                        placeholderTextColor="rgba(255,255,255,0.5)"
+                        value={lastName}
+                        onChangeText={setLastName}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
 
               {/* Email Input */}
               <View style={styles.inputGroup}>
@@ -188,36 +252,65 @@ export default function AuthScreen() {
                 </View>
               </View>
 
-              {/* Sign In Button */}
+              {/* Sign In/Sign Up Button */}
               <Pressable
-                style={[styles.signInButton, (!email.trim() || !password.trim()) && styles.signInButtonDisabled]}
-                onPress={handleSignIn}
-                disabled={isLoading || !email.trim() || !password.trim()}
+                style={[
+                  styles.signInButton, 
+                  (isSignUp 
+                    ? (!email.trim() || !password.trim() || !firstName.trim() || !lastName.trim())
+                    : (!email.trim() || !password.trim())
+                  ) && styles.signInButtonDisabled
+                ]}
+                onPress={isSignUp ? handleSignUp : handleSignIn}
+                disabled={
+                  isLoading || isRegistering || 
+                  (isSignUp 
+                    ? (!email.trim() || !password.trim() || !firstName.trim() || !lastName.trim())
+                    : (!email.trim() || !password.trim())
+                  )
+                }
               >
-                {isLoading ? (
+                {(isLoading || isRegistering) ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <Text style={styles.signInButtonText}>Sign In</Text>
+                  <Text style={styles.signInButtonText}>
+                    {isSignUp ? 'Create Account' : 'Sign In'}
+                  </Text>
                 )}
               </Pressable>
 
-              {/* Demo Button */}
+              {/* Demo Button - only show for sign in */}
+              {!isSignUp && (
+                <Pressable
+                  style={styles.demoButton}
+                  onPress={handleDemoLogin}
+                  disabled={isLoading || isRegistering}
+                >
+                  <Text style={styles.demoButtonText}>Try Demo Account</Text>
+                </Pressable>
+              )}
+
+              {/* Toggle between Sign In and Sign Up */}
               <Pressable
-                style={styles.demoButton}
-                onPress={handleDemoLogin}
-                disabled={isLoading}
+                style={styles.toggleButton}
+                onPress={() => {
+                  setIsSignUp(!isSignUp);
+                  // Clear form when switching
+                  setEmail('');
+                  setPassword('');
+                  setFirstName('');
+                  setLastName('');
+                }}
+                disabled={isLoading || isRegistering}
               >
-                <Text style={styles.demoButtonText}>Try Demo Account</Text>
+                <Text style={styles.toggleButtonText}>
+                  {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+                </Text>
               </Pressable>
             </View>
           </View>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Don't have an account? Contact support to get started.
-            </Text>
-          </View>
+          {/* Footer - removed since we have signup integrated */}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -352,5 +445,29 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
     textAlign: 'center',
+    marginBottom: 16,
+  },
+  signUpButton: {
+    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 1)',
+    borderRadius: 16,
+    height: 48,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleButton: {
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  toggleButtonText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
