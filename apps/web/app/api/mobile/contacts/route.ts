@@ -62,7 +62,8 @@ export async function POST(request: NextRequest) {
           lifecyclestage: 'lead',
           lead_source: 'Mobile App',
           notes_last_contacted: contact.notes || ''
-        }
+        },
+        associations: []
       });
 
       if (hubspotContact?.id) {
