@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     // Find user by deviceId
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, organizationId')
+      .select('id, organization_id')
       .eq('mobile_device_id', deviceId)
       .single();
 
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       .from('crm_connections')
       .upsert({
         user_id: userData.id,
-        organization_id: userData.organizationId,
+        organization_id: userData.organization_id,
         provider: 'hubspot',
         portal_id: portalId,
         access_token: tokens.access_token,
