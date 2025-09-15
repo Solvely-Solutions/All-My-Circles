@@ -106,7 +106,58 @@ export class ApiService {
   }
 
   /**
-   * Add contact to mobile database
+   * Create contact and sync to backend/HubSpot
+   */
+  async createContact(contact: any): Promise<any> {
+    if (!this.deviceId) {
+      throw new Error('Device ID not set');
+    }
+
+    // Extract first name and last name from the contact
+    const name = contact.name || '';
+    const nameParts = name.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    // Extract email and phone from identifiers
+    const email = contact.identifiers?.find((id: any) => id.type === 'email')?.value || '';
+    const phone = contact.identifiers?.find((id: any) => id.type === 'phone')?.value || '';
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/mobile/contacts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': this.deviceId,
+        },
+        body: JSON.stringify({
+          name: contact.name,
+          email: email,
+          phone: phone,
+          company: contact.company,
+          title: contact.title,
+          notes: contact.note,
+          tags: contact.tags,
+          groups: contact.groups,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create contact');
+      }
+
+      devLog('Contact created successfully:', data);
+      return data;
+    } catch (error) {
+      devError('Create contact failed', error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  /**
+   * Add contact to mobile database (legacy method)
    */
   async addContact(contact: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>): Promise<Contact> {
     if (!this.deviceId) {

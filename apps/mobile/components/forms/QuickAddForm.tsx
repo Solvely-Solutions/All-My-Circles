@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Chip } from '../ui/Chip';
 import { Contact } from '../../types/contact';
-import { MOCK_TAGS } from '../../data/mockData';
+import { useAppState } from '../../contexts/AppStateContext';
 
 interface QuickAddFormProps {
   editingContact?: Contact | null;
@@ -19,14 +19,28 @@ interface QuickAddFormProps {
 }
 
 export function QuickAddForm({ editingContact, onCancel, onSave }: QuickAddFormProps) {
+  const { contacts } = useAppState();
   const [name, setName] = useState(editingContact?.name || "");
-  const [identifier, setIdentifier] = useState(editingContact?.identifiers[0]?.value || "");
+  const [identifier, setIdentifier] = useState(editingContact?.identifiers?.[0]?.value || "");
   const [company, setCompany] = useState(editingContact?.company || "");
   const [title, setTitle] = useState(editingContact?.title || "");
   const [note, setNote] = useState(editingContact?.note || "");
   const [tags, setTags] = useState<string[]>(editingContact?.tags || []);
   const [groupInput, setGroupInput] = useState("");
   const [groups, setGroups] = useState<string[]>(editingContact?.groups || []);
+
+  // Get unique tags from all existing contacts
+  const availableTags = React.useMemo(() => {
+    const allTags = new Set<string>();
+    if (contacts && Array.isArray(contacts)) {
+      contacts.forEach(contact => {
+        if (contact.tags && Array.isArray(contact.tags)) {
+          contact.tags.forEach(tag => allTags.add(tag));
+        }
+      });
+    }
+    return Array.from(allTags).sort();
+  }, [contacts]);
 
   // Reset form when editingContact changes
   useEffect(() => {
@@ -81,11 +95,13 @@ export function QuickAddForm({ editingContact, onCancel, onSave }: QuickAddFormP
       <View style={styles.formField}>
         <Text style={styles.formLabel}>Tags</Text>
         <View style={styles.tagsContainer}>
-          {MOCK_TAGS.map((t) => (
+          {availableTags.length > 0 ? availableTags.map((t) => (
             <Pressable key={t} onPress={() => toggleTag(t)} style={styles.tagButton}>
               <Chip active={tags.includes(t)}>{t}</Chip>
             </Pressable>
-          ))}
+          )) : (
+            <Text style={styles.emptyText}>No tags yet - create your first contact to see tags here</Text>
+          )}
         </View>
       </View>
 
@@ -212,5 +228,10 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     fontSize: 16,
     fontWeight: '600',
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 });

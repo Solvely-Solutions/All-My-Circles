@@ -1,5 +1,6 @@
 import { offlineStorage, OfflineQueueItem } from './offlineStorage';
 import { Contact, ContactGroup } from '../types/contact';
+import { apiService } from './apiService';
 
 export interface SyncResult {
   success: boolean;
@@ -91,23 +92,16 @@ class SyncService {
     }
   }
 
-  private async processAddContact(payload: any): Promise<void> {
-    // In a real app, this would make an API call to the backend
-    // For now, we'll simulate success
+  private async processAddContact(payload: Contact): Promise<void> {
     console.log('Processing add contact:', payload);
-    
-    // Simulate potential network failure (10% chance)
-    if (Math.random() < 0.1) {
-      throw new Error('Network timeout while adding contact');
+
+    try {
+      await apiService.createContact(payload);
+      console.log('Successfully synced contact to backend and HubSpot');
+    } catch (error) {
+      console.error('Failed to sync contact:', error);
+      throw new Error(`Failed to add contact: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    
-    // In a real implementation:
-    // const response = await fetch('/api/contacts', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(payload)
-    // });
-    // if (!response.ok) throw new Error('Failed to add contact');
   }
 
   private async processEditContact(payload: any): Promise<void> {
@@ -202,6 +196,12 @@ class SyncService {
       console.error('Failed to get queue status:', error);
       return { pending: 0, syncing: 0, failed: 0, total: 0 };
     }
+  }
+
+  // Public method to immediately sync a contact to backend
+  async syncContact(contact: Contact): Promise<void> {
+    console.log('Syncing contact immediately:', contact);
+    await this.processAddContact(contact);
   }
 }
 

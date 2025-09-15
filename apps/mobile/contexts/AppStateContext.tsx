@@ -14,7 +14,7 @@
 
 import React, { createContext, useContext, useState, useMemo, ReactNode, useEffect, useCallback } from 'react';
 import { Contact, ContactGroup, EnrichmentSuggestion, ViewType, ContactFilters, ImportedContact, SearchHistory } from '../types/contact';
-import { seedContacts, seedGroups, seedSuggestions } from '../data/mockData';
+// Mock data removed - now using real data from backend
 import { storageService, OfflineQueueItem } from '../services/storageService';
 import { syncService } from '../services/syncService';
 
@@ -227,16 +227,16 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
           setSuggestions(appState.suggestions);
           setFilters(appState.filters);
         } else {
-          // First time user, load seed data
-          setContacts(seedContacts);
-          setGroups(seedGroups);
-          setSuggestions(seedSuggestions);
-          
-          // Save seed data immediately
+          // First time user, start with empty data
+          setContacts([]);
+          setGroups([]);
+          setSuggestions([]);
+
+          // Save empty data immediately
           await storageService.saveAppState({
-            contacts: seedContacts,
-            groups: seedGroups,
-            suggestions: seedSuggestions,
+            contacts: [],
+            groups: [],
+            suggestions: [],
             filters: {
               query: "",
               starred: false,
@@ -251,10 +251,10 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
         setOfflineQueue(existingQueue);
         
       } catch (error) {
-        console.error('Failed to load app state, using seed data:', error);
-        setContacts(seedContacts);
-        setGroups(seedGroups);
-        setSuggestions(seedSuggestions);
+        console.error('Failed to load app state, starting with empty data:', error);
+        setContacts([]);
+        setGroups([]);
+        setSuggestions([]);
       } finally {
         setIsDataLoaded(true);
         setIsLoading(false);
@@ -372,16 +372,27 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
         };
         setGroups((prev) => [...prev, newGroup]);
       } else {
-        setGroups((prev) => prev.map((g) => 
-          g.id === existingGroup.id 
+        setGroups((prev) => prev.map((g) =>
+          g.id === existingGroup.id
             ? { ...g, members: [...new Set([...g.members, id])] }
             : g
         ));
       }
     });
 
-    // Add to offline queue if offline
-    if (!isOnline) {
+    // Send to backend and sync to HubSpot
+    if (isOnline) {
+      syncService.syncContact(newContact).catch((error) => {
+        console.error('Failed to sync contact to backend:', error);
+        // Add to offline queue for retry
+        addToOfflineQueue({
+          type: 'add_contact',
+          payload: newContact,
+          status: 'pending'
+        });
+      });
+    } else {
+      // Add to offline queue if offline
       addToOfflineQueue({
         type: 'add_contact',
         payload: newContact,
