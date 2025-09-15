@@ -115,7 +115,9 @@ class HubSpotAuthService {
       }
 
       // Exchange code for tokens via our backend
-      const response = await fetch(`${apiService.baseUrl}/api/hubspot/oauth/exchange`, {
+      const exchangeUrl = `${apiService.baseUrl}/api/hubspot/oauth/exchange`;
+      devLog('Calling token exchange URL:', exchangeUrl);
+      const response = await fetch(exchangeUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -128,7 +130,9 @@ class HubSpotAuthService {
       });
 
       if (!response.ok) {
-        throw new Error(`Token exchange failed: HTTP ${response.status}`);
+        const errorText = await response.text();
+        devLog('Token exchange error response:', errorText);
+        throw new Error(`Token exchange failed: HTTP ${response.status} - ${errorText}`);
       }
 
       const tokens: HubSpotTokens = await response.json();
