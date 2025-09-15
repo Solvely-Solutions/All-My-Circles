@@ -6,7 +6,7 @@
 import { devLog, devError } from '../utils/logger';
 import type { Contact } from '../types/contact';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'https://all-my-circles-web-ltp4.vercel.app/api';
 
 export class ApiService {
   private deviceId: string | null = null;
