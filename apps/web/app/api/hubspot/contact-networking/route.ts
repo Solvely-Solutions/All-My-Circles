@@ -77,9 +77,9 @@ export async function GET(request: NextRequest) {
 
           meetingHistory = interactions?.map(interaction => ({
             date: interaction.date,
-            event: interaction.event?.name || interaction.interaction_type,
+            event: (interaction as any).event?.name || (interaction as any).interaction_type,
             notes: interaction.notes,
-            location: interaction.location || interaction.event?.location
+            location: (interaction as any).location || (interaction as any).event?.location
           })) || [];
 
         } catch (dbError) {
