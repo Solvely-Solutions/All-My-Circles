@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       });
 
       // Calculate sync statistics
-      const totalHubSpotContacts = allMyCirclesContacts.total;
+      const totalHubSpotContacts = allMyCirclesContacts.results.length;
       const syncedContacts = networkingContacts.length;
       const syncProgress = totalHubSpotContacts > 0 ? (syncedContacts / totalHubSpotContacts) * 100 : 0;
 

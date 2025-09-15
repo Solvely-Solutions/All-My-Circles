@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       registered: false,
       requiresAuthentication: true,
       nextStep: 'authenticate_with_email'
-    }, { status: 201 });
+    }, 201);
 
   } catch (error) {
     console.error('Device registration error:', error);

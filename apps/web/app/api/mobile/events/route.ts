@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Failed to create event', 500);
     }
 
-    return createApiResponse(event, { status: 201 });
+    return createApiResponse(event, 201);
 
   } catch (error) {
     console.error('Create event error:', error);

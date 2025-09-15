@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function HubSpotCallback() {
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
+function HubSpotCallbackContent() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -61,5 +64,36 @@ export default function HubSpotCallback() {
         `}</style>
       </div>
     </div>
+  );
+}
+
+export default function HubSpotCallback() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#0b1220',
+        color: 'white',
+        fontFamily: 'system-ui, -apple-system, sans-serif'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            border: '3px solid #3b82f6',
+            borderTop: '3px solid transparent',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }} />
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    }>
+      <HubSpotCallbackContent />
+    </Suspense>
   );
 }

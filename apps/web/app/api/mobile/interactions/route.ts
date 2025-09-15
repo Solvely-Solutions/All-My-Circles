@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
         .eq('id', interactionData.contact_id);
     }
 
-    return createApiResponse(interaction, { status: 201 });
+    return createApiResponse(interaction, 201);
 
   } catch (error) {
     console.error('Create interaction error:', error);

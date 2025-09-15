@@ -240,7 +240,11 @@ export async function GET(request: NextRequest) {
     const pendingSyncCount = syncStats?.filter(c => c.mobile_sync_needed).length || 0;
 
     // Get recent changes since last sync
-    let recentChanges = {
+    let recentChanges: {
+      contacts: any[];
+      events: any[];
+      interactions: any[];
+    } = {
       contacts: [],
       events: [],
       interactions: []
