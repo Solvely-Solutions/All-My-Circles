@@ -100,11 +100,17 @@ class HubSpotAuthService {
 
       // Verify state parameter contains our deviceId
       try {
-        const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+        // Use atob for base64 decoding in React Native
+        // First decode URL encoding, then base64
+        const decodedState = decodeURIComponent(state);
+        const stateData = JSON.parse(atob(decodedState));
+        devLog('Parsed state data:', stateData);
         if (stateData.deviceId !== this.deviceId) {
           throw new Error('Invalid state parameter - device ID mismatch');
         }
       } catch (parseError) {
+        devLog('State parameter parsing error:', parseError);
+        devLog('Raw state parameter:', state);
         throw new Error('Invalid state parameter format');
       }
 
