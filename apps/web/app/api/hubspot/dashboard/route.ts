@@ -26,9 +26,7 @@ export async function GET(request: NextRequest) {
         undefined, // propertiesWithHistory
         undefined, // associations
         false, // archived
-        undefined, // filterGroups
-        // Add search filter for contacts with All My Circles data
-        undefined
+        undefined // filterGroups
       );
 
       // Filter contacts that have All My Circles data
