@@ -44,13 +44,14 @@ export async function POST(request: NextRequest) {
 }
 
 async function processWebhookEvent(event: any) {
-  const { subscriptionType, objectType, objectId, portalId, changeFlag, propertyName, propertyValue } = event;
+  const { subscriptionType, objectType, objectTypeId, objectId, portalId, changeFlag, propertyName, propertyValue } = event;
 
-  console.log('Processing webhook event:', { subscriptionType, objectType, objectId, portalId, propertyName });
+  console.log('Processing webhook event:', { subscriptionType, objectType, objectTypeId, objectId, portalId, propertyName });
 
-  // We're primarily interested in contact events
-  if (objectType !== 'contact') {
-    console.log('Ignoring non-contact event:', objectType);
+  // We're primarily interested in contact events - HubSpot sends objectTypeId "0-1" for contacts
+  const isContactEvent = objectType === 'contact' || objectTypeId === '0-1';
+  if (!isContactEvent) {
+    console.log('Ignoring non-contact event:', { objectType, objectTypeId });
     return;
   }
 
