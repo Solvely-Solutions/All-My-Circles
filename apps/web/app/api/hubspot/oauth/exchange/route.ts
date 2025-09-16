@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
       'crm.objects.companies.write',
       'crm.objects.deals.read',
       'crm.objects.deals.write',
+      'crm.objects.owners.read',
       'crm.schemas.custom.read',
       'crm.schemas.custom.write',
       'integration-sync'
