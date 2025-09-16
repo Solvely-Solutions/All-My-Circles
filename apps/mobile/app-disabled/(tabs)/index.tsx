@@ -351,6 +351,17 @@ function AppContent() {
       const result = await hubspotContactsService.createContact(hubspotData);
 
       if (result.success) {
+        // Update local contact with HubSpot ID
+        if (result.hubspotId) {
+          console.log('🔗 Updating local contact with HubSpot ID:', result.hubspotId);
+          await updateContact(contact.id, {
+            ...contact,
+            hubspotContactId: result.hubspotId,
+            syncStatus: 'synced',
+            lastSyncedAt: new Date().toISOString()
+          });
+          console.log('✅ Local contact updated with HubSpot ID successfully');
+        }
         Alert.alert('Success', `${contact.name} has been sent to HubSpot!`);
       } else {
         throw new Error(result.error || 'Failed to create contact in HubSpot');
