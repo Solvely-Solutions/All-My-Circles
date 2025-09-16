@@ -40,17 +40,28 @@ export async function GET(
       return createErrorResponse('HubSpot connection not found', 404);
     }
 
-    // Fetch the contact from HubSpot
+    // Fetch the contact from HubSpot with error handling
     const hubspotClient = new Client({ accessToken: connections.access_token });
 
-    const hubspotContact = await hubspotClient.crm.contacts.basicApi.getById(
-      contactId,
-      [
-        'firstname', 'lastname', 'email', 'phone', 'company', 'jobtitle', 'hs_linkedin_url',
-        'amc_first_met_location', 'amc_first_met_date', 'amc_networking_tags', 'amc_networking_notes',
-        'hs_lastmodifieddate'
-      ]
-    );
+    let hubspotContact;
+    try {
+      hubspotContact = await hubspotClient.crm.contacts.basicApi.getById(
+        contactId,
+        [
+          'firstname', 'lastname', 'email', 'phone', 'company', 'jobtitle', 'hs_linkedin_url',
+          'amc_first_met_location', 'amc_first_met_date', 'amc_networking_tags', 'amc_networking_notes',
+          'hs_lastmodifieddate'
+        ]
+      );
+    } catch (hubspotError: any) {
+      console.error('HubSpot API error:', {
+        contactId,
+        status: hubspotError.code || hubspotError.status,
+        message: hubspotError.message,
+        body: hubspotError.body
+      });
+      throw hubspotError;
+    }
 
     const props = hubspotContact.properties;
 
@@ -79,11 +90,21 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('❌ Failed to fetch HubSpot contact:', error);
+    console.error('❌ Failed to fetch HubSpot contact:', {
+      contactId,
+      deviceId,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
 
     // Handle HubSpot API errors
     if (error instanceof Error && error.message.includes('404')) {
       return createErrorResponse('Contact not found in HubSpot', 404);
+    }
+
+    // Handle token expiration
+    if (error instanceof Error && (error.message.includes('401') || error.message.includes('EXPIRED_AUTHENTICATION'))) {
+      return createErrorResponse('HubSpot token expired', 401);
     }
 
     return createErrorResponse(
