@@ -77,7 +77,7 @@ async function handleContactPropertyChange(event: any) {
 
   // Process both AMC properties and standard HubSpot properties for bi-directional sync
   const importantProperties = [
-    'firstname', 'lastname', 'email', 'phone', 'company', 'jobtitle',
+    'firstname', 'lastname', 'email', 'phone', 'company', 'jobtitle', 'hs_linkedin_url',
     'amc_first_met_location', 'amc_first_met_date', 'amc_networking_tags', 'amc_networking_notes'
   ];
 
@@ -149,6 +149,7 @@ async function updateContactDirectly(connection: any, hubspotContactId: string, 
       'phone': 'phone',
       'company': 'company',
       'jobtitle': 'job_title',
+      'hs_linkedin_url': 'linkedin_url',
       'amc_first_met_location': 'first_met_location',
       'amc_first_met_date': 'first_met_date',
       'amc_networking_tags': 'tags',

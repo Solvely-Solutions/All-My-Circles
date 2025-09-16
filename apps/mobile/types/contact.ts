@@ -14,6 +14,7 @@ export interface Contact {
   name?: string; // computed from firstName + lastName for backward compatibility
   email?: string;
   phone?: string;
+  linkedinUrl?: string;
   identifiers?: ContactIdentifier[];
   company?: string;
   jobTitle?: string;

@@ -129,6 +129,7 @@ class HubSpotContactsService {
     phone?: string;
     company?: string;
     title?: string;
+    linkedinUrl?: string;
     notes?: string;
     createdByUserId?: string;
     createdByEmail?: string;
@@ -166,6 +167,7 @@ class HubSpotContactsService {
           phone: contactData.phone || undefined,
           company: contactData.company || undefined,
           jobtitle: contactData.title || undefined,
+          hs_linkedin_url: contactData.linkedinUrl || undefined,
           hubspot_owner_id: contactData.hubspotOwnerId || undefined,
 
           // All My Circles essential networking properties
