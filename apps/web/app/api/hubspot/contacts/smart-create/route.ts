@@ -39,21 +39,52 @@ export async function POST(request: NextRequest) {
     if (!hubspotUserId) {
       try {
         console.log('Getting HubSpot user info for owner assignment...');
-        const userInfoResponse = await fetch('https://api.hubapi.com/oauth/v1/access-tokens/' + hubspotToken);
 
-        if (userInfoResponse.ok) {
-          const userInfo = await userInfoResponse.json();
-          hubspotUserId = userInfo.user_id;
+        // First get the token info to get the user email
+        const tokenInfoResponse = await fetch('https://api.hubapi.com/oauth/v1/access-tokens/' + hubspotToken);
 
-          // Store for future use
-          await supabase
-            .from('users')
-            .update({ hubspot_user_id: hubspotUserId })
-            .eq('id', userData.id);
+        if (tokenInfoResponse.ok) {
+          const tokenInfo = await tokenInfoResponse.json();
+          console.log('Token info:', tokenInfo);
 
-          console.log('Retrieved and stored HubSpot user ID:', hubspotUserId);
+          // Now get the actual HubSpot users to find the matching user
+          const usersResponse = await fetch('https://api.hubapi.com/crm/v3/owners/', {
+            headers: {
+              'Authorization': `Bearer ${hubspotToken}`,
+            },
+          });
+
+          if (usersResponse.ok) {
+            const usersData = await usersResponse.json();
+            console.log('HubSpot users found:', usersData.results?.length || 0);
+
+            // Find the current user by email or user_id
+            const currentUser = usersData.results?.find((user: any) =>
+              user.email === tokenInfo.user ||
+              user.userId === tokenInfo.user_id ||
+              user.id === tokenInfo.user_id
+            );
+
+            if (currentUser) {
+              hubspotUserId = currentUser.id;
+              console.log('Found matching HubSpot user:', currentUser);
+
+              // Store for future use
+              await supabase
+                .from('users')
+                .update({ hubspot_user_id: hubspotUserId })
+                .eq('id', userData.id);
+
+              console.log('Retrieved and stored HubSpot user ID:', hubspotUserId);
+            } else {
+              console.warn('Could not find matching HubSpot user, will skip owner assignment');
+              console.log('Available users:', usersData.results?.map((u: any) => ({ id: u.id, email: u.email, userId: u.userId })));
+            }
+          } else {
+            console.warn('Could not retrieve HubSpot users list');
+          }
         } else {
-          console.warn('Could not retrieve HubSpot user ID, will skip owner assignment');
+          console.warn('Could not retrieve token info');
         }
       } catch (userInfoError) {
         console.warn('Failed to get HubSpot user info:', userInfoError);
