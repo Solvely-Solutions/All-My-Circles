@@ -184,10 +184,15 @@ class HubSpotSyncService {
       const contactIndex = allContacts.findIndex(c => c.id === localContact.id);
       if (contactIndex !== -1) {
         // Preserve local-only fields and update from HubSpot
+        const updatedFirstName = hubspotContact.firstName || localContact.firstName;
+        const updatedLastName = hubspotContact.lastName || localContact.lastName;
+        const updatedName = `${updatedFirstName} ${updatedLastName}`.trim();
+
         allContacts[contactIndex] = {
           ...localContact,
-          firstName: hubspotContact.firstName || localContact.firstName,
-          lastName: hubspotContact.lastName || localContact.lastName,
+          name: updatedName, // Update the display name
+          firstName: updatedFirstName,
+          lastName: updatedLastName,
           email: hubspotContact.email || localContact.email,
           phone: hubspotContact.phone || localContact.phone,
           company: hubspotContact.company || localContact.company,
