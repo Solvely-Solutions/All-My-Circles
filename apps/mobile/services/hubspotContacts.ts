@@ -121,6 +121,75 @@ class HubSpotContactsService {
   }
 
   /**
+   * Refresh the access token if it's expired
+   */
+  private async refreshAccessToken(): Promise<boolean> {
+    try {
+      const deviceId = await AsyncStorage.getItem('@allmycircles_device_id');
+      if (!deviceId) {
+        devError('Device ID not found, cannot refresh token');
+        return false;
+      }
+
+      devLog('🔄 Refreshing HubSpot access token...');
+
+      const response = await fetch('https://all-my-circles-web-ltp4.vercel.app/api/mobile/auth/hubspot/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-force-refresh': 'true', // Force refresh even if token seems valid
+        },
+        body: JSON.stringify({ deviceId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        devError('Token refresh failed:', errorData);
+        return false;
+      }
+
+      const tokenData = await response.json();
+
+      // Update our stored access token
+      this.accessToken = tokenData.accessToken;
+      await AsyncStorage.setItem('@hubspot_access_token', tokenData.accessToken);
+
+      devLog('✅ HubSpot access token refreshed successfully');
+      return true;
+
+    } catch (error) {
+      devError('Token refresh error:', error instanceof Error ? error : new Error(String(error)));
+      return false;
+    }
+  }
+
+  /**
+   * Make a HubSpot API call with automatic token refresh on 401 errors
+   */
+  private async makeHubSpotApiCall<T>(apiCall: () => Promise<T>): Promise<T> {
+    try {
+      return await apiCall();
+    } catch (error: any) {
+      // Check if it's a 401 unauthorized error (expired token)
+      if (error?.status === 401 || error?.message?.includes('expired') || error?.message?.includes('unauthorized')) {
+        devLog('🔑 Access token expired, attempting refresh...');
+
+        const refreshed = await this.refreshAccessToken();
+        if (refreshed) {
+          // Retry the API call with the new token
+          devLog('🔄 Retrying API call with refreshed token...');
+          return await apiCall();
+        } else {
+          throw new Error('Failed to refresh access token. Please re-authenticate with HubSpot.');
+        }
+      }
+
+      // Re-throw other errors
+      throw error;
+    }
+  }
+
+  /**
    * Create a new contact in HubSpot
    */
   async createContact(contactData: {

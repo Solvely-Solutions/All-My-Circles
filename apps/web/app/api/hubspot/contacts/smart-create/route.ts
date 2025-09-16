@@ -1,6 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiResponse, createErrorResponse, supabase } from '../../../../../lib/api-utils';
 
+// Helper function to refresh HubSpot access token
+async function refreshHubSpotToken(userId: string): Promise<string | null> {
+  try {
+    console.log('🔄 Refreshing HubSpot token for user:', userId);
+
+    // Get the refresh token
+    const { data: connection, error } = await supabase
+      .from('crm_connections')
+      .select('refresh_token, access_token')
+      .eq('user_id', userId)
+      .eq('provider', 'hubspot')
+      .eq('is_active', true)
+      .single();
+
+    if (error || !connection?.refresh_token) {
+      console.error('No refresh token found:', error);
+      return null;
+    }
+
+    // Refresh the token
+    const refreshResponse = await fetch('https://api.hubapi.com/oauth/v1/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: process.env.HUBSPOT_CLIENT_ID!,
+        client_secret: process.env.HUBSPOT_CLIENT_SECRET!,
+        refresh_token: connection.refresh_token,
+      }),
+    });
+
+    if (!refreshResponse.ok) {
+      console.error('Token refresh failed:', await refreshResponse.text());
+      return null;
+    }
+
+    const tokens = await refreshResponse.json();
+
+    // Update the token in the database
+    await supabase
+      .from('crm_connections')
+      .update({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .eq('provider', 'hubspot');
+
+    console.log('✅ HubSpot token refreshed successfully');
+    return tokens.access_token;
+
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    return null;
+  }
+}
+
+// Helper function to make HubSpot API calls with automatic token refresh
+async function makeHubSpotApiCall(
+  url: string,
+  options: RequestInit,
+  token: string,
+  userId: string
+): Promise<Response> {
+  // Add authorization header
+  const headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${token}`,
+  };
+
+  const response = await fetch(url, { ...options, headers });
+
+  // If unauthorized, try refreshing the token and retry
+  if (response.status === 401) {
+    console.log('🔑 Access token expired, refreshing...');
+    const newToken = await refreshHubSpotToken(userId);
+
+    if (newToken) {
+      console.log('🔄 Retrying API call with refreshed token...');
+      const retryHeaders = {
+        ...options.headers,
+        'Authorization': `Bearer ${newToken}`,
+      };
+      return fetch(url, { ...options, headers: retryHeaders });
+    }
+  }
+
+  return response;
+}
+
 // Smart HubSpot contact creation with ownership logic
 export async function POST(request: NextRequest) {
   try {
@@ -41,7 +135,12 @@ export async function POST(request: NextRequest) {
         console.log('Getting HubSpot user info for owner assignment...');
 
         // First get the token info to get the user email
-        const tokenInfoResponse = await fetch('https://api.hubapi.com/oauth/v1/access-tokens/' + hubspotToken);
+        const tokenInfoResponse = await makeHubSpotApiCall(
+          'https://api.hubapi.com/oauth/v1/access-tokens/' + hubspotToken,
+          { method: 'GET' },
+          hubspotToken,
+          userData.id
+        );
 
         if (tokenInfoResponse.ok) {
           const tokenInfo = await tokenInfoResponse.json();
@@ -260,14 +359,18 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      const createResponse = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${hubspotToken}`,
+      const createResponse = await makeHubSpotApiCall(
+        'https://api.hubapi.com/crm/v3/objects/contacts',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ properties: newContactData }),
         },
-        body: JSON.stringify({ properties: newContactData }),
-      });
+        hubspotToken,
+        userData.id
+      );
 
       if (!createResponse.ok) {
         const createError = await createResponse.json();
