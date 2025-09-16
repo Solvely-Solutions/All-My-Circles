@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateHubSpotConfig, testHubSpotConnectivity } from '../../../lib/hubspot-config-validator';
+import { validateHubSpotConfig, testHubSpotConnectivity } from '../../../../lib/hubspot-config-validator';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
