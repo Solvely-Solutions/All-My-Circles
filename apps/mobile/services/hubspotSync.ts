@@ -6,6 +6,7 @@
 import { devLog, devError } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Contact } from '../types/contact';
+import { storageService } from './storageService';
 
 const API_BASE_URL = 'https://all-my-circles-web-ltp4.vercel.app/api';
 
@@ -68,9 +69,9 @@ class HubSpotSyncService {
     try {
       devLog('📥 Checking for HubSpot contact updates...');
 
-      // Get local contacts that have HubSpot IDs
-      const contactsJson = await AsyncStorage.getItem('@circles/contacts');
-      const localContacts: Contact[] = contactsJson ? JSON.parse(contactsJson) : [];
+      // Get local contacts that have HubSpot IDs from app state
+      const appState = await storageService.loadAppState();
+      const localContacts: Contact[] = appState?.contacts || [];
 
       devLog(`📱 Found ${localContacts.length} total local contacts`);
 
@@ -107,7 +108,14 @@ class HubSpotSyncService {
 
       // Save updated contacts if any were changed
       if (updatedCount > 0) {
-        await AsyncStorage.setItem('@circles/contacts', JSON.stringify(localContacts));
+        // Save updated contacts back to storage using the same method as the main app
+        const currentAppState = await storageService.loadAppState();
+        if (currentAppState) {
+          await storageService.saveAppState({
+            ...currentAppState,
+            contacts: localContacts
+          });
+        }
         devLog(`💾 Saved ${updatedCount} updated contacts to storage`);
       }
 
@@ -215,9 +223,9 @@ class HubSpotSyncService {
     const syncErrors: { syncId: string; error: string }[] = [];
     let updatedContacts = 0;
 
-    // Get current contacts from storage
-    const contactsJson = await AsyncStorage.getItem('@circles/contacts');
-    const contacts: Contact[] = contactsJson ? JSON.parse(contactsJson) : [];
+    // Get current contacts from storage using the same method as the main app
+    const appState = await storageService.loadAppState();
+    const contacts: Contact[] = appState?.contacts || [];
 
     let contactsModified = false;
 
@@ -286,8 +294,14 @@ class HubSpotSyncService {
 
     // Save updated contacts back to storage
     if (contactsModified) {
-      await AsyncStorage.setItem('@circles/contacts', JSON.stringify(contacts));
-      devLog(`💾 Saved updated contacts to storage`);
+      const currentAppState = await storageService.loadAppState();
+      if (currentAppState) {
+        await storageService.saveAppState({
+          ...currentAppState,
+          contacts: contacts
+        });
+        devLog(`💾 Saved updated contacts to storage`);
+      }
     }
 
     return { updatedContacts, processedSyncIds, syncErrors };
