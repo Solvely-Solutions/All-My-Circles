@@ -13,6 +13,7 @@ export interface CRMConnection {
   fieldMappings: CRMFieldMapping[];
   lastSync?: string;
   createdAt: string;
+  metadata?: Record<string, any>; // For storing additional data like userId
 }
 
 export interface CRMCredentials {

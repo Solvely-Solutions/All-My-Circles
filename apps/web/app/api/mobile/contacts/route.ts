@@ -9,7 +9,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, phone, company, title, notes, tags, groups } = body;
+    const {
+      name, email, phone, company, title, notes, tags, groups,
+      // All My Circles specific fields
+      connectionStrength, contactValue, firstMetLocation, firstMetDate,
+      lastInteractionDate, nextFollowupDate, totalInteractions
+    } = body;
 
     if (!name) {
       return createApiResponse({ error: 'Name is required' }, 400);
@@ -27,7 +32,6 @@ export async function POST(request: NextRequest) {
     const { data: contact, error: contactError } = await supabase
       .from('contacts')
       .insert({
-        user_id: user.id,
         organization_id: organization.id,
         first_name: name.split(' ')[0] || '',
         last_name: name.split(' ').slice(1).join(' ') || '',
@@ -37,7 +41,14 @@ export async function POST(request: NextRequest) {
         job_title: title || null,
         notes: notes || null,
         tags: tags || [],
-        contact_source: 'mobile_app'
+        // All My Circles specific fields
+        connection_strength: connectionStrength || null,
+        contact_value: contactValue || null,
+        first_met_location: firstMetLocation || null,
+        first_met_date: firstMetDate || null,
+        last_interaction_date: lastInteractionDate || null,
+        next_followup_date: nextFollowupDate || null,
+        total_interactions: totalInteractions || 0
       })
       .select()
       .single();
@@ -53,6 +64,7 @@ export async function POST(request: NextRequest) {
 
       const hubspotContact = await hubspotClient.crm.contacts.basicApi.create({
         properties: {
+          // Standard HubSpot properties
           firstname: contact.first_name,
           lastname: contact.last_name,
           email: contact.email,
@@ -61,7 +73,18 @@ export async function POST(request: NextRequest) {
           jobtitle: contact.job_title,
           lifecyclestage: 'lead',
           lead_source: 'Mobile App',
-          notes_last_contacted: contact.notes || ''
+
+          // All My Circles custom properties
+          amc_connection_strength: contact.connection_strength,
+          amc_contact_value: contact.contact_value,
+          amc_first_met_location: contact.first_met_location,
+          amc_first_met_date: contact.first_met_date,
+          amc_networking_tags: tags && tags.length > 0 ? tags.join(', ') : null,
+          amc_networking_notes: contact.notes,
+          amc_last_interaction_date: contact.last_interaction_date,
+          amc_next_followup_date: contact.next_followup_date,
+          amc_total_interactions: (contact.total_interactions || 0).toString(),
+          amc_contact_id: contact.id, // Store the Supabase contact ID
         },
         associations: []
       });
@@ -117,11 +140,11 @@ export async function GET(request: NextRequest) {
       return createApiResponse({ error: 'User not found' }, 404);
     }
 
-    // Get contacts for this user
+    // Get contacts for this organization
     const { data: contacts, error: contactsError } = await supabase
       .from('contacts')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('organization_id', organization.id)
       .order('created_at', { ascending: false });
 
     if (contactsError) {
@@ -140,6 +163,14 @@ export async function GET(request: NextRequest) {
       jobTitle: contact.job_title,
       notes: contact.notes,
       tags: contact.tags || [],
+      // All My Circles specific fields
+      connection_strength: contact.connection_strength,
+      contact_value: contact.contact_value,
+      first_met_location: contact.first_met_location,
+      first_met_date: contact.first_met_date,
+      last_interaction_date: contact.last_interaction_date,
+      next_followup_date: contact.next_followup_date,
+      total_interactions: contact.total_interactions || 0,
       hubspotContactId: contact.hubspot_contact_id,
       createdAt: contact.created_at,
       updatedAt: contact.updated_at

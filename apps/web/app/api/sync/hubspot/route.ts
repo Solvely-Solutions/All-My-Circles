@@ -67,6 +67,7 @@ async function updateSyncLog(syncLogId: string, updates: any) {
     .eq('id', syncLogId);
 }
 
+
 // POST /api/sync/hubspot - Trigger HubSpot sync
 export async function POST(request: NextRequest) {
   try {

@@ -3,6 +3,7 @@
  * Provides unified interface for multiple CRM providers
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { devLog, devError } from '../utils/logger';
 import type { 
   CRMConnection, 
@@ -18,6 +19,8 @@ import type {
   PipedriveContact
 } from '../types/crm';
 import type { Contact } from '../types/contact';
+
+const STORAGE_KEY = '@allmycircles_crm_connections';
 
 class CRMService {
   private connections: Map<string, CRMConnection> = new Map();
@@ -42,12 +45,17 @@ class CRMService {
   /**
    * Add a new CRM connection
    */
-  async addConnection(connection: Omit<CRMConnection, 'id' | 'createdAt'>): Promise<string> {
-    const id = `crm_${connection.provider}_${Date.now()}`;
+  async addConnection(connection: Omit<CRMConnection, 'id' | 'createdAt'>, userId?: string): Promise<string> {
+    const id = `crm_${connection.provider}_${userId || 'anonymous'}_${Date.now()}`;
     const fullConnection: CRMConnection = {
       ...connection,
       id,
       createdAt: new Date().toISOString(),
+      // Store user association in the connection metadata
+      metadata: {
+        ...(connection.metadata || {}),
+        userId: userId,
+      }
     };
 
     // Test the connection before saving
@@ -58,8 +66,8 @@ class CRMService {
 
     this.connections.set(id, fullConnection);
     await this.saveConnectionsToStorage();
-    
-    devLog(`Added CRM connection: ${connection.provider} - ${connection.name}`);
+
+    devLog(`Added CRM connection: ${connection.provider} - ${connection.name} for user: ${userId || 'anonymous'}`);
     return id;
   }
 
@@ -417,69 +425,24 @@ class CRMService {
 
   private async loadConnectionsFromStorage(): Promise<CRMConnection[]> {
     try {
-      // Mock storage with demo connections for testing
-      const demoConnections: CRMConnection[] = [
-        {
-          id: 'demo_hubspot_1',
-          provider: 'hubspot',
-          name: 'Demo HubSpot',
-          isActive: true,
-          credentials: {
-            hubspotAccessToken: 'demo_token_hs_123',
-            hubspotPortalId: 'demo_portal_456',
-          },
-          fieldMappings: [
-            {
-              localField: 'name',
-              crmField: 'firstname',
-              required: true,
-            },
-            {
-              localField: 'company',
-              crmField: 'company',
-              required: false,
-            },
-          ],
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          lastSync: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 'demo_salesforce_1',
-          provider: 'salesforce',
-          name: 'Demo Salesforce',
-          isActive: true,
-          credentials: {
-            salesforceAccessToken: 'demo_token_sf_789',
-            salesforceInstanceUrl: 'https://demo.my.salesforce.com',
-            salesforceRefreshToken: 'demo_refresh_sf_789',
-          },
-          fieldMappings: [
-            {
-              localField: 'name',
-              crmField: 'FirstName',
-              required: true,
-            },
-            {
-              localField: 'company',
-              crmField: 'Account.Name',
-              required: false,
-            },
-          ],
-          createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-      ];
-      
-      return demoConnections;
-    } catch {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const connections: CRMConnection[] = JSON.parse(stored);
+        devLog(`Loaded ${connections.length} CRM connections from storage`);
+        return connections;
+      }
+      return [];
+    } catch (error) {
+      devError('Failed to load CRM connections from storage', error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }
 
   private async saveConnectionsToStorage(): Promise<void> {
     try {
-      // TODO: Implement with actual storage service
       const connections = Array.from(this.connections.values());
-      // await storageService.saveData('crm_connections', connections);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(connections));
+      devLog(`Saved ${connections.length} CRM connections to storage`);
     } catch (error) {
       devError('Failed to save CRM connections', error instanceof Error ? error : new Error(String(error)));
     }

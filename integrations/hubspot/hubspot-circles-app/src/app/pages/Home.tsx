@@ -105,7 +105,7 @@ const AllMyCirclesHomePage = ({ context }) => {
       console.log('Sync completed:', syncResult);
 
       setConnectionStatus('connected');
-      
+
       // Refresh dashboard data to show updated stats
       await fetchDashboardData();
 

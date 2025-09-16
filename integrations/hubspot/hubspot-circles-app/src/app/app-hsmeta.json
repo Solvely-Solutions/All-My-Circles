@@ -27,7 +27,13 @@
     "permittedUrls": {
       "fetch": [
         "https://api.hubapi.com",
-        "https://api.solvely.com"
+        "https://api.solvely.com",
+        "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/contact-networking",
+        "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/dashboard",
+        "https://all-my-circles-web-ltp4.vercel.app/api/sync/hubspot",
+        "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/properties/create",
+        "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/webhooks",
+        "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/webhooks/manage"
       ],
       "iframe": [],
       "img": []

@@ -5,6 +5,7 @@
 
 import { devLog, devError } from '../utils/logger';
 import type { Contact } from '../types/contact';
+import { notificationService } from './notificationService';
 
 const API_BASE_URL = 'https://all-my-circles-web-ltp4.vercel.app/api';
 
@@ -182,10 +183,19 @@ export class ApiService {
           email: email,
           phone: phone,
           company: contact.company,
-          title: contact.title,
-          notes: contact.note,
+          title: contact.title || contact.jobTitle,
+          notes: contact.note || contact.notes,
           tags: contact.tags,
           groups: contact.groups,
+
+          // All My Circles specific properties
+          connectionStrength: contact.connectionStrength,
+          contactValue: contact.contactValue,
+          firstMetLocation: contact.firstMetLocation,
+          firstMetDate: contact.firstMetDate,
+          lastInteractionDate: contact.lastInteractionDate,
+          nextFollowupDate: contact.nextFollowupDate,
+          totalInteractions: contact.totalInteractions || 0,
         }),
       });
 
@@ -225,13 +235,17 @@ export class ApiService {
           phone: contact.phone,
           company: contact.company,
           job_title: contact.jobTitle,
-          connection_strength: contact.connectionStrength,
-          contact_value: contact.contactValue,
-          first_met_location: contact.firstMetLocation,
-          first_met_date: contact.firstMetDate,
-          tags: contact.tags,
           notes: contact.notes,
-          next_followup_date: contact.nextFollowupDate,
+          tags: contact.tags,
+
+          // All My Circles specific properties
+          connectionStrength: contact.connectionStrength,
+          contactValue: contact.contactValue,
+          firstMetLocation: contact.firstMetLocation,
+          firstMetDate: contact.firstMetDate,
+          lastInteractionDate: contact.lastInteractionDate,
+          nextFollowupDate: contact.nextFollowupDate,
+          totalInteractions: contact.totalInteractions || 0,
         }),
       });
 
@@ -256,9 +270,11 @@ export class ApiService {
         contactValue: data.contact_value,
         firstMetLocation: data.first_met_location,
         firstMetDate: data.first_met_date,
+        lastInteractionDate: data.last_interaction_date,
+        nextFollowupDate: data.next_followup_date,
+        totalInteractions: data.total_interactions || 0,
         tags: data.tags || [],
         notes: data.notes,
-        nextFollowupDate: data.next_followup_date,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         hubspotContactId: data.hubspot_contact_id,
@@ -303,9 +319,11 @@ export class ApiService {
         contactValue: contact.contact_value,
         firstMetLocation: contact.first_met_location,
         firstMetDate: contact.first_met_date,
+        lastInteractionDate: contact.last_interaction_date,
+        nextFollowupDate: contact.next_followup_date,
+        totalInteractions: contact.total_interactions || 0,
         tags: contact.tags || [],
         notes: contact.notes,
-        nextFollowupDate: contact.next_followup_date,
         createdAt: contact.created_at,
         updatedAt: contact.updated_at,
         hubspotContactId: contact.hubspot_contact_id,

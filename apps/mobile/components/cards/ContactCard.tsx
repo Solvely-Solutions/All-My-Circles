@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { StarIcon, MapPin, Mail, Phone, Trash2, ArrowRight } from 'lucide-react-native';
+import { StarIcon, MapPin, Mail, Phone, Trash2, ArrowRight, Send } from 'lucide-react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -23,9 +23,10 @@ interface ContactCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onView: () => void;
+  onSendToHubSpot: () => void;
 }
 
-export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact, onStar, onEdit, onDelete, onView }) {
+export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact, onStar, onEdit, onDelete, onView, onSendToHubSpot }) {
   const primaryEmail = contact.identifiers.find(id => id.type === 'email')?.value;
   const primaryPhone = contact.identifiers.find(id => id.type === 'phone')?.value;
 
@@ -33,6 +34,7 @@ export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact
   const scale = useSharedValue(1);
   const starScale = useSharedValue(1);
   const deleteScale = useSharedValue(1);
+  const hubspotScale = useSharedValue(1);
 
   // Haptic feedback function
   const triggerHaptic = (type: 'light' | 'medium' | 'heavy' = 'light') => {
@@ -84,6 +86,19 @@ export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact
       runOnJS(onDelete)();
     });
 
+  // HubSpot button press gesture
+  const hubspotPressGesture = Gesture.Tap()
+    .onBegin(() => {
+      runOnJS(triggerHaptic)('medium');
+      hubspotScale.value = withSequence(
+        withSpring(0.9, { damping: 15, stiffness: 400 }),
+        withSpring(1, { damping: 15, stiffness: 300 })
+      );
+    })
+    .onFinalize(() => {
+      runOnJS(onSendToHubSpot)();
+    });
+
   // Animated styles
   const cardAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -100,6 +115,12 @@ export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact
   const deleteAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [{ scale: deleteScale.value }],
+    };
+  });
+
+  const hubspotAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: hubspotScale.value }],
     };
   });
 
@@ -171,8 +192,19 @@ export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact
                 />
               </Animated.View>
             </GestureDetector>
+            <GestureDetector gesture={hubspotPressGesture}>
+              <Animated.View
+                style={[styles.actionButton, styles.hubspotButton, hubspotAnimatedStyle]}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Send to HubSpot"
+                accessibilityHint="Sends this contact to your connected HubSpot CRM"
+              >
+                <Send size={16} color="#ff6600" />
+              </Animated.View>
+            </GestureDetector>
             <GestureDetector gesture={deletePressGesture}>
-              <Animated.View 
+              <Animated.View
                 style={[styles.actionButton, styles.deleteButton, deleteAnimatedStyle]}
                 accessible={true}
                 accessibilityRole="button"
@@ -182,7 +214,7 @@ export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact
                 <Trash2 size={16} color="#ef4444" />
               </Animated.View>
             </GestureDetector>
-            <Animated.View 
+            <Animated.View
               style={styles.actionButton}
               accessible={true}
               accessibilityRole="button"
@@ -321,5 +353,9 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: 'rgba(239,68,68,0.15)',
     borderColor: 'rgba(239,68,68,0.4)',
+  },
+  hubspotButton: {
+    backgroundColor: 'rgba(255,102,0,0.15)',
+    borderColor: 'rgba(255,102,0,0.4)',
   },
 });

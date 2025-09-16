@@ -174,7 +174,7 @@ export function CRMConnectModal({ visible, onClose, onSuccess }: CRMConnectModal
         fieldMappings: getDefaultFieldMappings('hubspot'),
       };
 
-      const connectionId = await crmService.addConnection(connection);
+      const connectionId = await crmService.addConnection(connection, user?.id);
       const fullConnection = crmService.getConnections().find(c => c.id === connectionId);
 
       if (fullConnection) {
@@ -213,7 +213,7 @@ export function CRMConnectModal({ visible, onClose, onSuccess }: CRMConnectModal
         fieldMappings: getDefaultFieldMappings(formData.provider),
       };
 
-      const connectionId = await crmService.addConnection(connection);
+      const connectionId = await crmService.addConnection(connection, user?.id);
       const fullConnection = crmService.getConnections().find(c => c.id === connectionId);
       
       if (fullConnection) {

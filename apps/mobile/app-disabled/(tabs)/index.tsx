@@ -55,6 +55,7 @@ import { ContactDetailModal } from '../../components/modals/ContactDetailModal';
 import { CRMConnectModal } from '../../components/modals/CRMConnectModal';
 import { CRMActionButton } from '../../components/ui/CRMActionButton';
 import { crmService } from '../../services/crmService';
+import { hubspotContactsService } from '../../services/hubspotContacts';
 import { GroupManagementModal } from '../../components/modals/GroupManagementModal';
 import { QuickAddForm } from '../../components/forms/QuickAddForm';
 import { useAppState, AppStateProvider } from '../../contexts/AppStateContext';
@@ -291,6 +292,76 @@ function AppContent() {
     );
   }, [deleteContact]);
 
+  const handleSendToHubSpot = useCallback(async (contactId: string) => {
+    try {
+      const contact = contacts.find(c => c.id === contactId);
+      if (!contact) {
+        Alert.alert('Error', 'Contact not found');
+        return;
+      }
+
+      // Check if HubSpot is connected
+      const activeConnections = crmService.getActiveConnections();
+      const hubspotConnection = activeConnections.find(conn => conn.provider === 'hubspot');
+
+      if (!hubspotConnection) {
+        Alert.alert(
+          'HubSpot Not Connected',
+          'Please connect to HubSpot first to send contacts.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Connect', onPress: () => setShowCRMConnect(true) },
+          ]
+        );
+        return;
+      }
+
+      // Initialize HubSpot service with credentials from connection
+      const accessToken = hubspotConnection.credentials.hubspotAccessToken;
+      const portalId = hubspotConnection.credentials.hubspotPortalId;
+
+      if (!accessToken || !portalId) {
+        Alert.alert('Error', 'HubSpot credentials are incomplete. Please reconnect to HubSpot.');
+        return;
+      }
+
+      // All credentials are now real OAuth tokens
+
+      hubspotContactsService.initialize(accessToken, portalId);
+
+      Alert.alert('Sending to HubSpot...', 'Contact will be sent to your HubSpot CRM');
+
+      // Extract contact data for HubSpot
+      const primaryEmail = contact.identifiers.find(id => id.type === 'email')?.value;
+      const primaryPhone = contact.identifiers.find(id => id.type === 'phone')?.value;
+
+      const hubspotData = {
+        name: contact.name,
+        email: primaryEmail,
+        phone: primaryPhone,
+        company: contact.company,
+        title: contact.title,
+        notes: contact.note,
+        // Associate with authenticated user
+        createdByUserId: user?.id,
+        createdByEmail: user?.email,
+      };
+
+      // Send to HubSpot using the real API
+      const result = await hubspotContactsService.createContact(hubspotData);
+
+      if (result.success) {
+        Alert.alert('Success', `${contact.name} has been sent to HubSpot!`);
+      } else {
+        throw new Error(result.error || 'Failed to create contact in HubSpot');
+      }
+
+    } catch (error) {
+      console.error('Failed to send contact to HubSpot:', error);
+      Alert.alert('Error', 'Failed to send contact to HubSpot. Please try again.');
+    }
+  }, [contacts]);
+
   const handleGroupOpen = useCallback((groupName: string) => {
     setActiveGroup(groupName);
     setView('contacts');
@@ -442,13 +513,13 @@ function AppContent() {
                       .map((c) => (
                         <SwipeableContactCard
                           key={c.id}
-                          contact={c} 
-                          onStar={() => toggleStar(c.id)} 
+                          contact={c}
+                          onStar={() => toggleStar(c.id)}
                           onView={() => setViewingContact(c)}
                           onEdit={() => {
                             setEditingContact(c);
                             setShowAdd(true);
-                          }} 
+                          }}
                           onDelete={() => {
                             Alert.alert(
                               'Delete Contact',
@@ -458,7 +529,8 @@ function AppContent() {
                                 { text: 'Delete', style: 'destructive', onPress: () => deleteContact(c.id) },
                               ]
                             );
-                          }} 
+                          }}
+                          onSendToHubSpot={() => handleSendToHubSpot(c.id)}
                         />
                       ))
                   )}
@@ -478,13 +550,13 @@ function AppContent() {
                     contacts.slice(0, 4).map((c) => (
                       <SwipeableContactCard
                         key={c.id}
-                        contact={c} 
-                        onStar={() => toggleStar(c.id)} 
+                        contact={c}
+                        onStar={() => toggleStar(c.id)}
                         onView={() => setViewingContact(c)}
                         onEdit={() => {
                           setEditingContact(c);
                           setShowAdd(true);
-                        }} 
+                        }}
                         onDelete={() => {
                           Alert.alert(
                             'Delete Contact',
@@ -494,7 +566,8 @@ function AppContent() {
                               { text: 'Delete', style: 'destructive', onPress: () => deleteContact(c.id) },
                             ]
                           );
-                        }} 
+                        }}
+                        onSendToHubSpot={() => handleSendToHubSpot(c.id)}
                       />
                     ))
                   )}
@@ -521,11 +594,12 @@ function AppContent() {
                     list.map((c) => (
                       <SwipeableContactCard
                         key={c.id}
-                        contact={c} 
-                        onStar={() => handleContactStar(c.id)} 
+                        contact={c}
+                        onStar={() => handleContactStar(c.id)}
                         onView={() => handleContactView(c)}
-                        onEdit={() => handleContactEdit(c)} 
-                        onDelete={() => handleContactDelete(c.id)} 
+                        onEdit={() => handleContactEdit(c)}
+                        onDelete={() => handleContactDelete(c.id)}
+                        onSendToHubSpot={() => handleSendToHubSpot(c.id)}
                       />
                     ))
                   )}

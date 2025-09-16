@@ -30,14 +30,16 @@ interface SwipeableContactCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onView: () => void;
+  onSendToHubSpot: () => void;
 }
 
-export const SwipeableContactCard = memo<SwipeableContactCardProps>(function SwipeableContactCard({ 
-  contact, 
-  onStar, 
-  onEdit, 
-  onDelete, 
-  onView 
+export const SwipeableContactCard = memo<SwipeableContactCardProps>(function SwipeableContactCard({
+  contact,
+  onStar,
+  onEdit,
+  onDelete,
+  onView,
+  onSendToHubSpot
 }) {
   const translateX = useSharedValue(0);
   const actionTriggered = useSharedValue(false);
@@ -283,6 +285,7 @@ export const SwipeableContactCard = memo<SwipeableContactCardProps>(function Swi
             onEdit={onEdit}
             onDelete={onDelete}
             onView={onView}
+            onSendToHubSpot={onSendToHubSpot}
           />
         </Animated.View>
       </GestureDetector>

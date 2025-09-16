@@ -24,7 +24,9 @@ export interface Contact {
   contactValue?: 'High' | 'Medium' | 'Low';
   firstMetLocation?: string;
   firstMetDate?: string;
+  lastInteractionDate?: string;
   nextFollowupDate?: string;
+  totalInteractions?: number;
   groups?: string[];
   tags: string[];
   notes?: string;

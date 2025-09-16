@@ -31,34 +31,49 @@ const NetworkingCard = ({ objectId, objectType }) => {
       setLoading(true);
       setError(null);
 
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       // Fetch real networking data from API
       const response = await hubspot.fetch(
-        `https://all-my-circles-web-ltp4.vercel.app/api/hubspot/contact-networking?contact_id=${objectId}`
+        `https://all-my-circles-web-ltp4.vercel.app/api/hubspot/contact-networking?contact_id=${objectId}`,
+        {
+          signal: controller.signal
+        }
       );
-      
+
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const apiResponse = await response.json();
-      
+
+      // Handle API-level errors
+      if (apiResponse.error) {
+        throw new Error(apiResponse.error);
+      }
+
       if (!apiResponse.hasData) {
         setNetworkingData(null);
         setLoading(false);
         return;
       }
 
-      // Transform API response to component data format
+      // Transform API response to component data format with validation
       const transformedData = {
-        connectionStrength: apiResponse.connectionStrength,
+        connectionStrength: apiResponse.connectionStrength || 'Unknown',
         lastInteraction: apiResponse.lastInteractionDate,
         networkingSource: apiResponse.firstMetLocation || 'Unknown source',
-        tags: apiResponse.tags || [],
-        meetingHistory: apiResponse.meetingHistory || [],
-        totalInteractions: apiResponse.totalInteractions || 0,
+        tags: Array.isArray(apiResponse.tags) ? apiResponse.tags : [],
+        meetingHistory: Array.isArray(apiResponse.meetingHistory) ? apiResponse.meetingHistory : [],
+        totalInteractions: parseInt(apiResponse.totalInteractions) || 0,
         nextFollowUp: apiResponse.nextFollowUpDate,
         contactValue: apiResponse.contactValue,
-        contact: apiResponse.contact,
+        contact: apiResponse.contact || {},
         lastSyncedAt: apiResponse.lastSyncedAt
       };
 
@@ -67,7 +82,16 @@ const NetworkingCard = ({ objectId, objectType }) => {
 
     } catch (err) {
       console.error('Error fetching networking data:', err);
-      setError(`Failed to load networking information: ${err.message}`);
+
+      let errorMessage = 'Failed to load networking information';
+
+      if (err.name === 'AbortError') {
+        errorMessage = 'Request timeout - please try again';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
       setLoading(false);
     }
   };
@@ -112,12 +136,38 @@ const NetworkingCard = ({ objectId, objectType }) => {
   }
 
   if (error) {
+    // Provide more specific error messages based on error type
+    const getErrorMessage = (errorText) => {
+      if (errorText.includes('404')) {
+        return 'Contact not found in our system. This contact may not have been synced from the mobile app yet.';
+      }
+      if (errorText.includes('403')) {
+        return 'Permission denied. Please check your HubSpot integration settings.';
+      }
+      if (errorText.includes('500')) {
+        return 'Server error occurred. Our team has been notified. Please try again in a few minutes.';
+      }
+      if (errorText.includes('network') || errorText.includes('fetch')) {
+        return 'Network connection issue. Please check your internet connection and try again.';
+      }
+      return errorText;
+    };
+
     return (
-      <Alert title="Error" variant="error">
-        {error}
-        <Button onClick={fetchNetworkingData} variant="secondary">
-          Retry
-        </Button>
+      <Alert title="Unable to Load Networking Data" variant="error">
+        <Text>{getErrorMessage(error)}</Text>
+        <Flex direction="row" gap="xs" style={{ marginTop: '12px' }}>
+          <Button onClick={fetchNetworkingData} variant="primary" size="xs">
+            🔄 Try Again
+          </Button>
+          <Button
+            onClick={() => console.log('Report issue for contact:', objectId)}
+            variant="secondary"
+            size="xs"
+          >
+            📝 Report Issue
+          </Button>
+        </Flex>
       </Alert>
     );
   }
@@ -125,22 +175,43 @@ const NetworkingCard = ({ objectId, objectType }) => {
   if (!networkingData) {
     return (
       <Flex direction="column" gap="medium" align="center">
-        <EmptyState 
-          title="No Networking Data Available"
+        <EmptyState
+          title="Ready to Add Networking Context"
           layout="vertical"
         >
-          <Text>This contact hasn't been synced from your All My Circles mobile app yet.</Text>
+          <Text>Transform this contact into a valuable networking connection!</Text>
           <Text variant="micro" format={{ color: 'secondary' }}>
-            To see networking context, connection history, and relationship insights, sync this contact from your All My Circles mobile app.
+            Add meeting context, connection strength, and follow-up reminders to make this contact work for your business.
           </Text>
-          <Flex gap="xs" justify="center" wrap="wrap">
-            <Button variant="primary" onClick={() => console.log('Import clicked for contact:', objectId)}>
-              📱 Import from Mobile App
+
+          <Flex direction="column" gap="xs" style={{ width: '100%', marginTop: '12px' }}>
+            <Button
+              variant="primary"
+              onClick={() => console.log('Import clicked for contact:', objectId)}
+              style={{ width: '100%' }}
+            >
+              📱 Sync from Mobile App
             </Button>
-            <Button variant="secondary" onClick={() => console.log('Manual entry clicked for contact:', objectId)}>
-              ✏️ Add Manually
+            <Button
+              variant="secondary"
+              onClick={() => console.log('Manual entry clicked for contact:', objectId)}
+              style={{ width: '100%' }}
+            >
+              ✏️ Add Networking Details
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => console.log('Create properties clicked')}
+              size="xs"
+              style={{ width: '100%' }}
+            >
+              ⚙️ Set Up Custom Properties
             </Button>
           </Flex>
+
+          <Text variant="micro" format={{ color: 'secondary', fontStyle: 'italic' }} style={{ marginTop: '12px' }}>
+            💡 Tip: Use the mobile app to capture networking context at events and conferences
+          </Text>
         </EmptyState>
       </Flex>
     );

@@ -1,6 +1,8 @@
 import { offlineStorage, OfflineQueueItem } from './offlineStorage';
 import { Contact, ContactGroup } from '../types/contact';
 import { apiService } from './apiService';
+import { hubspotContactsService } from './hubspotContacts';
+import { crmService } from './crmService';
 
 export interface SyncResult {
   success: boolean;
