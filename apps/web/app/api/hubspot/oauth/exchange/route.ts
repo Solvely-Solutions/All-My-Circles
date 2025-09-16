@@ -213,6 +213,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('Successfully stored CRM connection, now creating custom properties...');
+
+    // Create custom properties for All My Circles
+    try {
+      const propertiesResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://all-my-circles-web-ltp4.vercel.app'}/api/hubspot/properties/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokens.access_token}`,
+        },
+      });
+
+      if (propertiesResponse.ok) {
+        const propertiesResult = await propertiesResponse.json();
+        console.log('Custom properties created successfully:', propertiesResult);
+      } else {
+        const propertiesError = await propertiesResponse.text();
+        console.warn('Failed to create custom properties (non-fatal):', propertiesResponse.status, propertiesError);
+      }
+    } catch (propertiesError) {
+      console.warn('Property creation failed (non-fatal):', propertiesError);
+    }
+
     return NextResponse.json({
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
