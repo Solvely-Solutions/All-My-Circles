@@ -11,6 +11,7 @@
         "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/oauth-callback"
       ],
       "requiredScopes": [
+        "oauth",
         "crm.objects.contacts.read",
         "crm.objects.contacts.write",
         "crm.objects.companies.read",

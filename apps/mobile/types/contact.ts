@@ -37,6 +37,12 @@ export interface Contact {
   createdAt?: string;
   updatedAt?: string;
   hubspotContactId?: string;
+
+  // CRM sync tracking
+  syncStatus?: 'none' | 'synced' | 'pending' | 'failed';
+  lastSyncedAt?: string;
+  syncError?: string;
+  needsSync?: boolean; // Flag to indicate contact was edited and needs sync
 }
 
 export interface ContactGroup {
@@ -82,13 +88,15 @@ export interface ExtractedContactData {
 }
 
 // Offline queue types
-export type OfflineAction = 
-  | 'create_contact' 
-  | 'update_contact' 
-  | 'delete_contact' 
-  | 'create_group' 
-  | 'edit_group' 
-  | 'delete_group';
+export type OfflineAction =
+  | 'create_contact'
+  | 'update_contact'
+  | 'delete_contact'
+  | 'create_group'
+  | 'edit_group'
+  | 'delete_group'
+  | 'sync_contact_to_hubspot'
+  | 'update_hubspot_contact';
 
 export interface OfflineQueueItem {
   id: string;

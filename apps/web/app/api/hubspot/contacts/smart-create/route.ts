@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Device ID required', 401);
     }
 
-    // Get user information
+    // Get user information and HubSpot user ID
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select(`
@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
         email,
         first_name,
         last_name,
+        hubspot_user_id,
         crm_connections!inner(access_token, portal_id)
       `)
       .eq('mobile_device_id', deviceId)
@@ -32,6 +33,32 @@ export async function POST(request: NextRequest) {
 
     const hubspotToken = userData.crm_connections[0].access_token;
     const portalId = userData.crm_connections[0].portal_id;
+
+    // Get HubSpot user ID if not stored
+    let hubspotUserId = userData.hubspot_user_id;
+    if (!hubspotUserId) {
+      try {
+        console.log('Getting HubSpot user info for owner assignment...');
+        const userInfoResponse = await fetch('https://api.hubapi.com/oauth/v1/access-tokens/' + hubspotToken);
+
+        if (userInfoResponse.ok) {
+          const userInfo = await userInfoResponse.json();
+          hubspotUserId = userInfo.user_id;
+
+          // Store for future use
+          await supabase
+            .from('users')
+            .update({ hubspot_user_id: hubspotUserId })
+            .eq('id', userData.id);
+
+          console.log('Retrieved and stored HubSpot user ID:', hubspotUserId);
+        } else {
+          console.warn('Could not retrieve HubSpot user ID, will skip owner assignment');
+        }
+      } catch (userInfoError) {
+        console.warn('Failed to get HubSpot user info:', userInfoError);
+      }
+    }
 
     // Step 1: Check if contact already exists by email
     let existingContact = null;
@@ -126,13 +153,17 @@ export async function POST(request: NextRequest) {
         // Contact exists but no owner - claim it and update properties
         console.log('Contact exists but no owner, claiming and updating');
 
-        const updateData = {
-          hubspot_owner_id: userData.id, // Set All My Circles user as owner
+        const updateData: any = {
           amc_first_met_location: contactData.firstMetLocation || undefined,
           amc_first_met_date: contactData.firstMetDate || undefined,
           amc_networking_tags: Array.isArray(contactData.tags) ? contactData.tags.join(', ') : contactData.tags,
           amc_networking_notes: contactData.notes || undefined,
         };
+
+        // Only set owner if we have the HubSpot user ID
+        if (hubspotUserId) {
+          updateData.hubspot_owner_id = hubspotUserId;
+        }
 
         // Remove undefined values
         Object.keys(updateData).forEach(key => {
@@ -177,7 +208,7 @@ export async function POST(request: NextRequest) {
         phone: contactData.phone || undefined,
         company: contactData.company || undefined,
         jobtitle: contactData.title || undefined,
-        hubspot_owner_id: userData.id, // Set All My Circles user as owner
+        hubspot_owner_id: hubspotUserId, // Set HubSpot user as owner
         amc_first_met_location: contactData.firstMetLocation || undefined,
         amc_first_met_date: contactData.firstMetDate || undefined,
         amc_networking_tags: Array.isArray(contactData.tags) ? contactData.tags.join(', ') : contactData.tags,

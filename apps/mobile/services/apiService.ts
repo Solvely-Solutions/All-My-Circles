@@ -404,6 +404,54 @@ export class ApiService {
   }
 
   /**
+   * Update an existing contact
+   */
+  async updateContact(contactId: string, contact: Partial<Contact>): Promise<any> {
+    if (!this.deviceId) {
+      throw new Error('Device ID not set');
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/contacts/${contactId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': this.deviceId,
+        },
+        body: JSON.stringify({
+          first_name: contact.firstName,
+          last_name: contact.lastName,
+          email: contact.email,
+          phone: contact.phone,
+          company: contact.company,
+          job_title: contact.jobTitle,
+          notes: contact.notes,
+          tags: contact.tags,
+          connectionStrength: contact.connectionStrength,
+          contactValue: contact.contactValue,
+          firstMetLocation: contact.firstMetLocation,
+          firstMetDate: contact.firstMetDate,
+          lastInteractionDate: contact.lastInteractionDate,
+          nextFollowupDate: contact.nextFollowupDate,
+          totalInteractions: contact.totalInteractions || 0,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update contact');
+      }
+
+      devLog('Contact updated successfully:', data);
+      return data;
+    } catch (error) {
+      devError('Update contact failed', error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  /**
    * Get sync status and dashboard data
    */
   async getDashboardData(): Promise<any> {
@@ -419,7 +467,7 @@ export class ApiService {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to get dashboard data');
       }

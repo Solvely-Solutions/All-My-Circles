@@ -402,15 +402,57 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
   }, [groups, isOnline, addToOfflineQueue]);
 
   const updateContact = useMemo(() => (id: string, updates: Partial<Contact>) => {
-    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
-    
-    // Add to offline queue if offline
+    let updatedContact: Contact | undefined;
+
+    setContacts((prev) => {
+      const newContacts = prev.map((c) => {
+        if (c.id === id) {
+          updatedContact = { ...c, ...updates };
+          return updatedContact;
+        }
+        return c;
+      });
+      return newContacts;
+    });
+
+    // Handle sync based on online status
     if (!isOnline) {
+      // Add to offline queue if offline
       addToOfflineQueue({
         type: 'edit_contact',
         payload: { id, updates },
         status: 'pending'
       });
+    } else if (updatedContact) {
+      // Auto-sync to HubSpot if online and contact has HubSpot ID
+      if (updatedContact.hubspotContactId) {
+        console.log('Auto-syncing contact update to HubSpot:', updatedContact);
+
+        // Trigger immediate sync without waiting
+        syncService.syncContactUpdate(updatedContact, updatedContact.hubspotContactId)
+          .then(() => {
+            console.log('Contact auto-sync to HubSpot completed successfully');
+            // Update sync status on the contact
+            setContacts((prev) => prev.map((c) =>
+              c.id === id ? {
+                ...c,
+                syncStatus: 'synced',
+                lastSyncedAt: new Date().toISOString()
+              } : c
+            ));
+          })
+          .catch((error) => {
+            console.error('Contact auto-sync to HubSpot failed:', error);
+            // Update sync status to show error
+            setContacts((prev) => prev.map((c) =>
+              c.id === id ? {
+                ...c,
+                syncStatus: 'failed',
+                syncError: error.message
+              } : c
+            ));
+          });
+      }
     }
   }, [isOnline, addToOfflineQueue]);
 

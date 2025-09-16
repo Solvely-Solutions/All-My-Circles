@@ -108,12 +108,43 @@ class SyncService {
 
   private async processEditContact(payload: any): Promise<void> {
     console.log('Processing edit contact:', payload);
-    
-    if (Math.random() < 0.1) {
-      throw new Error('Network timeout while editing contact');
+
+    const { contact, hubspotContactId } = payload;
+
+    try {
+      // If the contact has a HubSpot ID, sync the updates to HubSpot
+      if (hubspotContactId && contact) {
+        const result = await hubspotContactsService.updateContact(hubspotContactId, {
+          name: contact.name,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          email: contact.email,
+          phone: contact.phone,
+          company: contact.company,
+          title: contact.title || contact.jobTitle,
+          notes: contact.notes || contact.note,
+          tags: contact.tags,
+          firstMetLocation: contact.firstMetLocation,
+          firstMetDate: contact.firstMetDate
+        });
+
+        if (!result.success) {
+          console.error('HubSpot contact update failed:', result.error);
+          throw new Error(`HubSpot sync failed: ${result.error}`);
+        }
+
+        console.log('Successfully synced contact updates to HubSpot:', result);
+      }
+
+      // Also sync to backend API if available
+      if (contact) {
+        await apiService.updateContact(contact.id, contact);
+        console.log('Successfully synced contact to backend');
+      }
+    } catch (error) {
+      console.error('Failed to sync contact edits:', error);
+      throw new Error(`Failed to edit contact: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    
-    // Real implementation would update the contact on the server
   }
 
   private async processDeleteContact(payload: any): Promise<void> {
@@ -204,6 +235,12 @@ class SyncService {
   async syncContact(contact: Contact): Promise<void> {
     console.log('Syncing contact immediately:', contact);
     await this.processAddContact(contact);
+  }
+
+  // Public method to immediately sync contact updates to HubSpot
+  async syncContactUpdate(contact: Contact, hubspotContactId?: string): Promise<void> {
+    console.log('Syncing contact updates immediately:', contact, hubspotContactId);
+    await this.processEditContact({ contact, hubspotContactId });
   }
 }
 
