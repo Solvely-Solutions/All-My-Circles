@@ -167,6 +167,42 @@ class HubSpotAuthService {
     }
   }
 
+  async refreshToken(): Promise<{ accessToken: string; expiresAt: string }> {
+    if (!this.deviceId) {
+      throw new Error('HubSpot Auth Service not initialized');
+    }
+
+    try {
+      devLog('Refreshing HubSpot access token...');
+
+      const response = await fetch(`${apiService.baseUrl}/api/mobile/auth/hubspot/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deviceId: this.deviceId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Token refresh failed: HTTP ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      devLog('Successfully refreshed HubSpot token');
+
+      return {
+        accessToken: data.accessToken,
+        expiresAt: data.expiresAt
+      };
+    } catch (error) {
+      devError('Failed to refresh HubSpot token:', error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
   async disconnect(): Promise<void> {
     if (!this.deviceId) {
       throw new Error('HubSpot Auth Service not initialized');

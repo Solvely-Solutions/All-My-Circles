@@ -48,27 +48,107 @@ export async function POST(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text();
-      console.error('HubSpot token exchange failed:', errorData);
+      console.error('HubSpot token exchange failed:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        error: errorData,
+        deviceId,
+        timestamp: new Date().toISOString()
+      });
+
+      // Parse error response to provide more specific error messages
+      let errorMessage = 'Failed to exchange authorization code';
+      try {
+        const parsedError = JSON.parse(errorData);
+        if (parsedError.error === 'invalid_grant') {
+          errorMessage = 'Authorization code has expired or is invalid. Please try again.';
+        } else if (parsedError.error === 'invalid_client') {
+          errorMessage = 'Invalid client configuration. Please contact support.';
+        } else if (parsedError.error_description) {
+          errorMessage = parsedError.error_description;
+        }
+      } catch (parseError) {
+        // Use default error message if parsing fails
+      }
+
       return NextResponse.json(
-        { error: 'Failed to exchange authorization code' },
+        {
+          error: errorMessage,
+          code: 'TOKEN_EXCHANGE_FAILED',
+          details: process.env.NODE_ENV === 'development' ? errorData : undefined
+        },
         { status: 400 }
       );
     }
 
     const tokens = await tokenResponse.json();
 
-    // Get account info to get portal ID
-    const accountResponse = await fetch('https://api.hubapi.com/account-info/v3/api-usage/daily', {
-      headers: {
-        'Authorization': `Bearer ${tokens.access_token}`,
-      },
-    });
+    // Validate that we received the expected scopes
+    const requiredScopes = [
+      'crm.objects.contacts.read',
+      'crm.objects.contacts.write',
+      'crm.objects.companies.read',
+      'crm.objects.companies.write',
+      'crm.objects.deals.read',
+      'crm.objects.deals.write',
+      'crm.schemas.custom.read',
+      'crm.schemas.custom.write',
+      'integration-sync'
+    ];
 
-    let portalId = 'unknown';
-    if (accountResponse.ok) {
-      const accountData = await accountResponse.json();
-      portalId = accountData.portalId?.toString() || 'unknown';
+    const grantedScopes = tokens.scope ? tokens.scope.split(' ') : [];
+    const missingScopes = requiredScopes.filter(scope => !grantedScopes.includes(scope));
+
+    if (missingScopes.length > 0) {
+      console.warn('Missing required scopes:', missingScopes);
+      // Continue but log the warning - some scopes might be optional depending on use case
     }
+
+    // Get portal ID from multiple sources for reliability
+    let portalId = 'unknown';
+
+    // First try: Get from token response (hub_id)
+    if (tokens.hub_id) {
+      portalId = tokens.hub_id.toString();
+    } else {
+      // Second try: Use account info API
+      try {
+        const accountResponse = await fetch('https://api.hubapi.com/account-info/v3/details', {
+          headers: {
+            'Authorization': `Bearer ${tokens.access_token}`,
+          },
+        });
+
+        if (accountResponse.ok) {
+          const accountData = await accountResponse.json();
+          portalId = accountData.portalId?.toString() || accountData.hubId?.toString() || 'unknown';
+        }
+      } catch (accountError) {
+        console.warn('Failed to retrieve portal ID from account API:', accountError);
+
+        // Third try: Use integrations API as fallback
+        try {
+          const integrationsResponse = await fetch('https://api.hubapi.com/crm/v3/objects/contacts?limit=1', {
+            headers: {
+              'Authorization': `Bearer ${tokens.access_token}`,
+            },
+          });
+
+          if (integrationsResponse.ok) {
+            // Extract portal ID from response headers or URL patterns if available
+            const responseText = await integrationsResponse.text();
+            const portalMatch = responseText.match(/"portalId":\s*(\d+)/);
+            if (portalMatch) {
+              portalId = portalMatch[1];
+            }
+          }
+        } catch (integrationsError) {
+          console.warn('Failed to retrieve portal ID from integrations API:', integrationsError);
+        }
+      }
+    }
+
+    console.log('Retrieved portal ID:', portalId);
 
     // Find user by deviceId
     const { data: userData, error: userError } = await supabase
@@ -96,7 +176,16 @@ export async function POST(request: NextRequest) {
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+        scopes: grantedScopes,
         is_active: true,
+        connection_name: 'HubSpot OAuth Connection',
+        metadata: {
+          token_type: tokens.token_type || 'Bearer',
+          granted_scopes: grantedScopes,
+          missing_scopes: missingScopes,
+          hub_domain: tokens.hub_domain,
+          hub_id: tokens.hub_id
+        },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, {

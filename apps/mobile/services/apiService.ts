@@ -28,6 +28,53 @@ export class ApiService {
   }
 
   /**
+   * Sign in existing user
+   */
+  async signIn(email: string, deviceInfo: any): Promise<any> {
+    try {
+      devLog('API Service signIn called');
+      devLog('this.deviceId value:', this.deviceId);
+      devLog('Attempting sign in with:', { email, deviceId: this.deviceId });
+
+      const response = await fetch(`${API_BASE_URL}/mobile/auth/signin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          deviceId: this.deviceId,
+          deviceInfo,
+        }),
+      });
+
+      devLog('API Response status:', response.status, response.statusText);
+
+      // Check if response has content
+      const responseText = await response.text();
+      devLog('API Response text:', responseText);
+
+      let data;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        devError('JSON Parse error:', parseError instanceof Error ? parseError : new Error(String(parseError)));
+        throw new Error(`Invalid response from server: ${responseText}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || `Sign in failed: ${response.status} ${response.statusText}`);
+      }
+
+      devLog('User signed in successfully:', data);
+      return data;
+    } catch (error) {
+      devError('Sign in failed', error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  /**
    * Register mobile device
    */
   async registerDevice(email: string, deviceInfo: any): Promise<any> {
@@ -320,7 +367,7 @@ export class ApiService {
           'x-device-id': this.deviceId,
         },
         body: JSON.stringify({
-          redirectUrl: 'allmycircles://oauth-callback',
+          redirectUrl: 'circles://oauth-callback',
         }),
       });
 

@@ -48,7 +48,7 @@ export default function HomePage() {
             <div className="flex items-center gap-6">
               <a href="#features" className="text-gray-300 hover:text-white transition-colors">Features</a>
               <a href="#pricing" className="text-gray-300 hover:text-white transition-colors">Pricing</a>
-              <a href="http://localhost:8081" className="text-blue-400 hover:text-blue-300 transition-colors">Try Web App</a>
+              <a href="https://all-my-circles-web-ltp4.vercel.app" className="text-blue-400 hover:text-blue-300 transition-colors">Try Web App</a>
               <button className="glass glass-hover px-6 py-2 rounded-full font-medium">
                 Get Started
               </button>

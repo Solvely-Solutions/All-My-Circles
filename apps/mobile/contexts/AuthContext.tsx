@@ -144,21 +144,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string) => {
     setIsLoading(true);
     try {
-      // Check if user data already exists in storage (from previous signup)
-      const [storedUserData, deviceId] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.USER_DATA),
-        AsyncStorage.getItem(STORAGE_KEYS.DEVICE_ID)
-      ]);
-
-      if (storedUserData && deviceId) {
-        // User already exists, restore from storage
-        const user = JSON.parse(storedUserData);
-        await apiService.initialize(deviceId);
-        setUser(user);
-        devLog('User signed in successfully from stored data');
-      } else {
-        throw new Error('No user data found. Please sign up first.');
+      // Try to get stored device ID, or generate a new one
+      let deviceId = await AsyncStorage.getItem(STORAGE_KEYS.DEVICE_ID);
+      if (!deviceId) {
+        deviceId = 'simulator-test-123';
+        await AsyncStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
       }
+
+      // Initialize API service
+      await apiService.initialize(deviceId);
+
+      // Try to authenticate with the server using existing email and device
+      // This will create a session if the user exists, or fail if they don't
+      const deviceInfo = {
+        firstName: '', // These will be filled from server response
+        lastName: '',
+        platform: 'ios',
+        model: 'iPhone Simulator',
+        osVersion: '18.0'
+      };
+
+      const userData = await apiService.signIn(email, deviceInfo);
+
+      const user: User = {
+        id: userData.user.id,
+        email: userData.user.email,
+        firstName: userData.user.firstName || '',
+        lastName: userData.user.lastName || '',
+        deviceId,
+        organizationId: userData.user.organizationId,
+        sessionToken: userData.authentication?.sessionToken
+      };
+
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+      if (userData.authentication?.sessionToken) {
+        await AsyncStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, userData.authentication.sessionToken);
+      }
+
+      setUser(user);
+      devLog('User signed in successfully');
     } catch (error) {
       devError('Sign in failed', error instanceof Error ? error : new Error(String(error)));
       throw error;
