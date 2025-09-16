@@ -73,92 +73,158 @@ async function processWebhookEvent(event: any) {
 async function handleContactPropertyChange(event: any) {
   const { objectId, portalId, propertyName, propertyValue } = event;
 
-  console.log('Contact property changed:', { objectId, propertyName, propertyValue });
+  console.log('📝 Contact property changed:', { objectId, propertyName, propertyValue });
 
-  // Only process changes to All My Circles custom properties
-  if (!propertyName?.startsWith('amc_')) {
-    console.log('Ignoring non-AMC property change:', propertyName);
+  // Process both AMC properties and standard HubSpot properties for bi-directional sync
+  const importantProperties = [
+    'firstname', 'lastname', 'email', 'phone', 'company', 'jobtitle',
+    'amc_first_met_location', 'amc_first_met_date', 'amc_networking_tags', 'amc_networking_notes'
+  ];
+
+  if (!importantProperties.includes(propertyName)) {
+    console.log('ℹ️  Ignoring property change:', propertyName);
     return;
   }
 
   try {
-    // Find the organization for this portal
-    const { data: organization } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('hubspot_portal_id', portalId.toString())
-      .single();
+    // Find all users connected to this HubSpot portal
+    const { data: connections, error: connectionError } = await supabase
+      .from('crm_connections')
+      .select(`
+        user_id,
+        portal_id,
+        access_token,
+        users!inner(mobile_device_id, email)
+      `)
+      .eq('provider', 'hubspot')
+      .eq('portal_id', portalId.toString())
+      .eq('is_active', true);
 
-    if (!organization) {
-      console.warn('Organization not found for portal:', portalId);
+    if (connectionError || !connections?.length) {
+      console.warn('❌ No active HubSpot connections found for portal:', portalId);
       return;
     }
 
-    // Find the contact in our database using HubSpot contact ID
-    const { data: contact } = await supabase
-      .from('contacts')
-      .select('*')
-      .eq('organization_id', organization.id)
-      .eq('hubspot_contact_id', objectId.toString())
-      .single();
+    console.log(`✅ Found ${connections.length} connected users for portal ${portalId}`);
 
-    if (!contact) {
-      console.warn('Contact not found in database:', objectId);
-      return;
+    // For each connected user, queue the sync
+    for (const connection of connections) {
+      await queueContactSync(connection, objectId.toString(), propertyName, propertyValue);
     }
-
-    // Map HubSpot custom property to our database field
-    const fieldMapping: { [key: string]: string } = {
-      'amc_connection_strength': 'connection_strength',
-      'amc_contact_value': 'contact_value',
-      'amc_first_met_location': 'first_met_location',
-      'amc_first_met_date': 'first_met_date',
-      'amc_networking_tags': 'tags',
-      'amc_networking_notes': 'notes',
-      'amc_last_interaction_date': 'last_interaction_date',
-      'amc_next_followup_date': 'next_followup_date',
-      'amc_total_interactions': 'total_interactions',
-    };
-
-    const dbField = fieldMapping[propertyName];
-    if (!dbField) {
-      console.log('No mapping found for property:', propertyName);
-      return;
-    }
-
-    // Prepare the update data
-    let updateValue = propertyValue;
-
-    // Special handling for specific fields
-    if (propertyName === 'amc_networking_tags' && typeof propertyValue === 'string') {
-      // Convert comma-separated string to array
-      updateValue = propertyValue.split(',').map((tag: string) => tag.trim()).filter(Boolean);
-    } else if (propertyName === 'amc_total_interactions') {
-      // Ensure it's a number
-      updateValue = parseInt(propertyValue) || 0;
-    }
-
-    // Update the contact in our database
-    const { error: updateError } = await supabase
-      .from('contacts')
-      .update({
-        [dbField]: updateValue,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', contact.id);
-
-    if (updateError) {
-      throw updateError;
-    }
-
-    console.log('Contact updated successfully:', { contactId: contact.id, field: dbField, value: updateValue });
-
-    // TODO: Optionally notify mobile app about the change via push notification or websocket
 
   } catch (error) {
-    console.error('Failed to handle contact property change:', error);
+    console.error('❌ Failed to handle contact property change:', error);
     throw error;
   }
+}
+
+async function queueContactSync(connection: any, hubspotContactId: string, propertyName: string, propertyValue: any) {
+  try {
+    console.log(`🔄 Queueing sync for user ${connection.users.email} (${connection.users.mobile_device_id})`);
+
+    // Map HubSpot properties to mobile app fields
+    const propertyMapping: { [key: string]: string } = {
+      'firstname': 'firstName',
+      'lastname': 'lastName',
+      'email': 'email',
+      'phone': 'phone',
+      'company': 'company',
+      'jobtitle': 'title',
+      'amc_first_met_location': 'firstMetLocation',
+      'amc_first_met_date': 'firstMetDate',
+      'amc_networking_tags': 'tags',
+      'amc_networking_notes': 'notes',
+    };
+
+    const mobileField = propertyMapping[propertyName];
+    if (!mobileField) {
+      console.log('ℹ️  No mobile field mapping for:', propertyName);
+      return;
+    }
+
+    // Process the value for mobile app format
+    let processedValue = propertyValue;
+    if (propertyName === 'amc_networking_tags' && typeof propertyValue === 'string') {
+      // Convert comma-separated string to array
+      processedValue = propertyValue.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+    }
+
+    // Create/update sync queue record
+    const syncRecord = {
+      user_id: connection.user_id,
+      device_id: connection.users.mobile_device_id,
+      hubspot_contact_id: hubspotContactId,
+      property_name: mobileField,
+      property_value: JSON.stringify(processedValue),
+      change_type: 'property_update',
+      processed: false,
+      created_at: new Date().toISOString(),
+    };
+
+    // Try to insert into sync queue (create table if needed)
+    const { error: insertError } = await supabase
+      .from('hubspot_sync_queue')
+      .upsert(syncRecord, {
+        onConflict: 'user_id,hubspot_contact_id,property_name',
+        ignoreDuplicates: false
+      });
+
+    if (insertError) {
+      // If table doesn't exist, create it
+      if (insertError.code === '42P01') {
+        await createSyncQueueTable();
+        // Retry the insert
+        const { error: retryError } = await supabase
+          .from('hubspot_sync_queue')
+          .upsert(syncRecord);
+
+        if (retryError) {
+          throw retryError;
+        }
+      } else {
+        throw insertError;
+      }
+    }
+
+    console.log(`✅ Queued sync: ${mobileField} = ${processedValue} for device ${connection.users.mobile_device_id}`);
+
+  } catch (error) {
+    console.error('❌ Failed to queue contact sync:', error);
+  }
+}
+
+async function createSyncQueueTable() {
+  console.log('📋 Creating hubspot_sync_queue table...');
+
+  const createTableSQL = `
+    CREATE TABLE IF NOT EXISTS hubspot_sync_queue (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      device_id TEXT NOT NULL,
+      hubspot_contact_id TEXT NOT NULL,
+      property_name TEXT NOT NULL,
+      property_value JSONB,
+      change_type TEXT DEFAULT 'property_update',
+      processed BOOLEAN DEFAULT FALSE,
+      processed_at TIMESTAMP,
+      error_message TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(user_id, hubspot_contact_id, property_name)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sync_queue_device_unprocessed
+    ON hubspot_sync_queue(device_id, processed)
+    WHERE processed = FALSE;
+  `;
+
+  const { error } = await supabase.rpc('exec_sql', { sql: createTableSQL });
+
+  if (error) {
+    console.error('❌ Failed to create sync queue table:', error);
+    throw error;
+  }
+
+  console.log('✅ Sync queue table created successfully');
 }
 
 async function handleContactCreation(event: any) {

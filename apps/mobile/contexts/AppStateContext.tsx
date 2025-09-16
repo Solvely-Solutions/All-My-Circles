@@ -17,6 +17,7 @@ import { Contact, ContactGroup, EnrichmentSuggestion, ViewType, ContactFilters, 
 // Mock data removed - now using real data from backend
 import { storageService, OfflineQueueItem } from '../services/storageService';
 import { syncService } from '../services/syncService';
+import { hubspotSyncService } from '../services/hubspotSync';
 
 
 
@@ -263,6 +264,19 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
 
     loadData();
   }, []);
+
+  // Initialize HubSpot bi-directional sync after data loads
+  useEffect(() => {
+    if (isDataLoaded) {
+      console.log('🔄 Starting HubSpot bi-directional sync...');
+      hubspotSyncService.startAutoSync();
+
+      // Cleanup sync on unmount
+      return () => {
+        hubspotSyncService.stopAutoSync();
+      };
+    }
+  }, [isDataLoaded]);
 
   // Auto-save data when state changes
   useEffect(() => {
