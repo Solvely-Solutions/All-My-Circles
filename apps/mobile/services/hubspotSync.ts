@@ -62,15 +62,50 @@ class HubSpotSyncService {
   }
 
   /**
-   * Manually trigger sync from HubSpot - simplified approach
+   * Manually trigger sync from HubSpot by checking for contact updates
    */
   async pullUpdatesFromHubSpot(): Promise<SyncResult> {
     try {
-      devLog('📥 Checking for HubSpot updates...');
+      devLog('📥 Checking for HubSpot contact updates...');
 
-      // For now, just return success - the real sync happens when webhooks
-      // trigger contact updates directly from HubSpot API
-      return { success: true, updatedContacts: 0, errors: [] };
+      // Get local contacts that have HubSpot IDs
+      const contactsJson = await AsyncStorage.getItem('@circles/contacts');
+      const localContacts: Contact[] = contactsJson ? JSON.parse(contactsJson) : [];
+
+      const hubspotContacts = localContacts.filter(c => c.hubspotContactId);
+
+      if (hubspotContacts.length === 0) {
+        devLog('ℹ️  No HubSpot-synced contacts found locally');
+        return { success: true, updatedContacts: 0, errors: [] };
+      }
+
+      devLog(`🔍 Checking ${hubspotContacts.length} HubSpot contacts for updates...`);
+
+      let updatedCount = 0;
+      const errors: string[] = [];
+
+      // Check each contact for updates
+      for (const localContact of hubspotContacts) {
+        try {
+          const wasUpdated = await this.checkAndUpdateContact(localContact, localContacts);
+          if (wasUpdated) {
+            updatedCount++;
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          devError(`Failed to check contact ${localContact.name}:`, errorMsg);
+          errors.push(`${localContact.name}: ${errorMsg}`);
+        }
+      }
+
+      // Save updated contacts if any were changed
+      if (updatedCount > 0) {
+        await AsyncStorage.setItem('@circles/contacts', JSON.stringify(localContacts));
+        devLog(`💾 Saved ${updatedCount} updated contacts to storage`);
+      }
+
+      devLog(`✅ HubSpot sync completed: ${updatedCount} contacts updated`);
+      return { success: true, updatedContacts: updatedCount, errors };
 
     } catch (error) {
       devError('HubSpot sync failed:', error instanceof Error ? error : new Error(String(error)));
@@ -79,6 +114,76 @@ class HubSpotSyncService {
         updatedContacts: 0,
         errors: [error instanceof Error ? error.message : String(error)]
       };
+    }
+  }
+
+  /**
+   * Check if a local contact needs updating from HubSpot and update it
+   */
+  private async checkAndUpdateContact(localContact: Contact, allContacts: Contact[]): Promise<boolean> {
+    if (!localContact.hubspotContactId) {
+      return false;
+    }
+
+    try {
+      // Fetch fresh contact data from HubSpot
+      const response = await fetch(`${API_BASE_URL}/mobile/contacts/hubspot/${localContact.hubspotContactId}`, {
+        method: 'GET',
+        headers: {
+          'x-device-id': await AsyncStorage.getItem('@allmycircles_device_id') || '',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          devLog(`ℹ️  Contact ${localContact.name} not found in HubSpot (may have been deleted)`);
+          return false;
+        }
+        throw new Error(`Failed to fetch contact: ${response.status}`);
+      }
+
+      const hubspotData = await response.json();
+      const hubspotContact = hubspotData.contact;
+
+      // Check if HubSpot contact was modified more recently than local
+      const hubspotModified = new Date(hubspotContact.updatedAt || 0).getTime();
+      const localModified = new Date(localContact.updatedAt || 0).getTime();
+
+      if (hubspotModified <= localModified) {
+        // Local contact is up to date
+        return false;
+      }
+
+      devLog(`🔄 Updating ${localContact.name} from HubSpot (${new Date(hubspotModified).toISOString()})`);
+
+      // Update local contact with HubSpot data
+      const contactIndex = allContacts.findIndex(c => c.id === localContact.id);
+      if (contactIndex !== -1) {
+        // Preserve local-only fields and update from HubSpot
+        allContacts[contactIndex] = {
+          ...localContact,
+          firstName: hubspotContact.firstName || localContact.firstName,
+          lastName: hubspotContact.lastName || localContact.lastName,
+          email: hubspotContact.email || localContact.email,
+          phone: hubspotContact.phone || localContact.phone,
+          company: hubspotContact.company || localContact.company,
+          title: hubspotContact.title || localContact.title,
+          linkedinUrl: hubspotContact.linkedinUrl || localContact.linkedinUrl,
+          firstMetLocation: hubspotContact.firstMetLocation || localContact.firstMetLocation,
+          firstMetDate: hubspotContact.firstMetDate || localContact.firstMetDate,
+          notes: hubspotContact.notes || localContact.notes,
+          tags: hubspotContact.tags || localContact.tags,
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'synced',
+          lastSyncedAt: new Date().toISOString(),
+        };
+
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      throw error;
     }
   }
 
