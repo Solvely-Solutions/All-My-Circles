@@ -168,17 +168,11 @@ class HubSpotContactsService {
           jobtitle: contactData.title || undefined,
           hubspot_owner_id: contactData.hubspotOwnerId || undefined,
 
-          // All My Circles custom properties
-          amc_connection_strength: contactData.connectionStrength || undefined,
-          amc_contact_value: contactData.contactValue || undefined,
+          // All My Circles essential networking properties
           amc_first_met_location: contactData.firstMetLocation || undefined,
           amc_first_met_date: contactData.firstMetDate || undefined,
           amc_networking_tags: contactData.tags ? contactData.tags.join(', ') : undefined,
           amc_networking_notes: contactData.notes || undefined,
-          amc_last_interaction_date: contactData.lastInteractionDate || undefined,
-          amc_next_followup_date: contactData.nextFollowupDate || undefined,
-          amc_total_interactions: contactData.totalInteractions ? contactData.totalInteractions.toString() : '0',
-          amc_contact_id: contactData.circlesContactId || undefined,
         }
       };
 
@@ -189,32 +183,35 @@ class HubSpotContactsService {
         }
       });
 
-      devLog('Creating HubSpot contact:', hubspotContact);
+      devLog('Creating HubSpot contact with smart logic:', contactData);
 
-      const response = await this.makeAPICall('https://api.hubapi.com/crm/v3/objects/contacts', {
+      // Use smart creation endpoint with ownership logic
+      const response = await fetch('https://all-my-circles-web-ltp4.vercel.app/api/hubspot/contacts/smart-create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-device-id': await AsyncStorage.getItem('@allmycircles_device_id') || '',
         },
-        body: JSON.stringify(hubspotContact),
+        body: JSON.stringify(contactData),
       });
 
       const responseData = await response.json();
 
       if (!response.ok) {
-        devError('HubSpot contact creation failed:', responseData);
+        devError('Smart HubSpot contact creation failed:', responseData);
         return {
           success: false,
-          error: responseData.message || `HTTP ${response.status}: ${response.statusText}`
+          error: responseData.error || `HTTP ${response.status}: ${response.statusText}`
         };
       }
 
-      devLog('HubSpot contact created successfully:', responseData);
+      devLog('Smart HubSpot contact creation result:', responseData);
 
       return {
         success: true,
-        contact: responseData,
-        hubspotId: responseData.id
+        contact: responseData.contact,
+        hubspotId: responseData.contactId,
+        action: responseData.action
       };
 
     } catch (error) {
@@ -425,6 +422,74 @@ class HubSpotContactsService {
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  /**
+   * Update an existing contact in HubSpot
+   */
+  async updateContact(contactId: string, contactData: {
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    company?: string;
+    title?: string;
+    notes?: string;
+    tags?: string[];
+    firstMetLocation?: string;
+    firstMetDate?: string;
+  }): Promise<ContactCreateResult> {
+    if (!this.accessToken) {
+      return {
+        success: false,
+        error: 'HubSpot Contacts Service not initialized. Call initialize() first.'
+      };
+    }
+
+    try {
+      devLog('Updating HubSpot contact:', contactId, contactData);
+
+      // Use smart update endpoint
+      const response = await fetch('https://all-my-circles-web-ltp4.vercel.app/api/hubspot/contacts/update', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': await AsyncStorage.getItem('@allmycircles_device_id') || '',
+        },
+        body: JSON.stringify({
+          contactId,
+          contactData
+        }),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        devError('HubSpot contact update failed:', responseData);
+        return {
+          success: false,
+          error: responseData.error || `HTTP ${response.status}: ${response.statusText}`
+        };
+      }
+
+      devLog('HubSpot contact updated successfully:', responseData);
+
+      return {
+        success: true,
+        contact: responseData.contact,
+        hubspotId: contactId,
+        updated: responseData.updated,
+        updatedFields: responseData.updatedFields
+      };
+
+    } catch (error) {
+      devError('HubSpot contact update error:', error instanceof Error ? error : new Error(String(error)));
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Update failed'
       };
     }
   }

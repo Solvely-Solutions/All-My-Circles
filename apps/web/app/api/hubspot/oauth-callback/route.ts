@@ -76,13 +76,44 @@ export async function GET(request: NextRequest) {
         </div>
 
         <script>
-          // Immediately redirect to mobile app
-          window.location.href = '${redirectUrl}';
+          // Multiple redirect attempts for better compatibility
+          function redirectToApp() {
+            // Method 1: Direct assignment
+            try {
+              window.location.href = '${redirectUrl}';
+            } catch (e) {
+              console.log('Direct redirect failed:', e);
+            }
 
-          // Show fallback after 3 seconds if redirect doesn't work
+            // Method 2: Create invisible iframe (works better on some browsers)
+            setTimeout(function() {
+              try {
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = '${redirectUrl}';
+                document.body.appendChild(iframe);
+              } catch (e) {
+                console.log('Iframe redirect failed:', e);
+              }
+            }, 100);
+
+            // Method 3: Try window.open as fallback
+            setTimeout(function() {
+              try {
+                window.open('${redirectUrl}', '_self');
+              } catch (e) {
+                console.log('Window.open redirect failed:', e);
+              }
+            }, 500);
+          }
+
+          // Try redirecting immediately
+          redirectToApp();
+
+          // Show fallback after 2 seconds if redirect doesn't work
           setTimeout(function() {
             document.getElementById('fallback').style.display = 'block';
-          }, 3000);
+          }, 2000);
         </script>
       </body>
     </html>

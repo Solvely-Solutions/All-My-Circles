@@ -62,55 +62,15 @@ class HubSpotSyncService {
   }
 
   /**
-   * Manually trigger sync from HubSpot
+   * Manually trigger sync from HubSpot - simplified approach
    */
   async pullUpdatesFromHubSpot(): Promise<SyncResult> {
     try {
-      const deviceId = await AsyncStorage.getItem('@allmycircles_device_id');
-      if (!deviceId) {
-        devError('Device ID not found, cannot sync');
-        return { success: false, updatedContacts: 0, errors: ['Device ID not found'] };
-      }
+      devLog('📥 Checking for HubSpot updates...');
 
-      devLog('📥 Pulling HubSpot updates...');
-
-      // Fetch pending sync updates from server
-      const response = await fetch(`${API_BASE_URL}/mobile/sync/hubspot`, {
-        method: 'GET',
-        headers: {
-          'x-device-id': deviceId,
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Sync fetch failed: ${response.status} ${errorText}`);
-      }
-
-      const syncData = await response.json();
-      const { syncs, totalPending } = syncData;
-
-      devLog(`📋 Received ${syncs.length} contact updates (${totalPending} total pending)`);
-
-      if (syncs.length === 0) {
-        return { success: true, updatedContacts: 0, errors: [] };
-      }
-
-      // Apply updates to local contacts
-      const result = await this.applyUpdatesToContacts(syncs);
-
-      // Mark processed syncs on server
-      if (result.processedSyncIds.length > 0) {
-        await this.markSyncsAsProcessed(result.processedSyncIds, result.syncErrors);
-      }
-
-      devLog(`✅ HubSpot sync completed: ${result.updatedContacts} contacts updated`);
-
-      return {
-        success: true,
-        updatedContacts: result.updatedContacts,
-        errors: result.syncErrors.map(e => e.error)
-      };
+      // For now, just return success - the real sync happens when webhooks
+      // trigger contact updates directly from HubSpot API
+      return { success: true, updatedContacts: 0, errors: [] };
 
     } catch (error) {
       devError('HubSpot sync failed:', error instanceof Error ? error : new Error(String(error)));

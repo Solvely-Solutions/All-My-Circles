@@ -107,9 +107,9 @@ async function handleContactPropertyChange(event: any) {
 
     console.log(`✅ Found ${connections.length} connected users for portal ${portalId}`);
 
-    // For each connected user, queue the sync
+    // For each connected user, update the contact directly in the contacts table
     for (const connection of connections) {
-      await queueContactSync(connection, objectId.toString(), propertyName, propertyValue);
+      await updateContactDirectly(connection, objectId.toString(), propertyName, propertyValue);
     }
 
   } catch (error) {
@@ -118,113 +118,75 @@ async function handleContactPropertyChange(event: any) {
   }
 }
 
-async function queueContactSync(connection: any, hubspotContactId: string, propertyName: string, propertyValue: any) {
+async function updateContactDirectly(connection: any, hubspotContactId: string, propertyName: string, propertyValue: any) {
   try {
-    console.log(`🔄 Queueing sync for user ${connection.users.email} (${connection.users.mobile_device_id})`);
+    console.log(`🔄 Updating contact directly for user ${connection.users.email}`);
 
-    // Map HubSpot properties to mobile app fields
+    // Find the contact in the contacts table
+    const { data: contacts, error: contactError } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('user_id', connection.user_id)
+      .eq('hubspot_contact_id', hubspotContactId);
+
+    if (contactError) {
+      console.error('❌ Error finding contact:', contactError);
+      return;
+    }
+
+    if (!contacts || contacts.length === 0) {
+      console.log('ℹ️  Contact not found locally:', hubspotContactId);
+      return;
+    }
+
+    const contact = contacts[0];
+
+    // Map HubSpot properties to contact table fields
     const propertyMapping: { [key: string]: string } = {
-      'firstname': 'firstName',
-      'lastname': 'lastName',
+      'firstname': 'first_name',
+      'lastname': 'last_name',
       'email': 'email',
       'phone': 'phone',
       'company': 'company',
-      'jobtitle': 'title',
-      'amc_first_met_location': 'firstMetLocation',
-      'amc_first_met_date': 'firstMetDate',
+      'jobtitle': 'job_title',
+      'amc_first_met_location': 'first_met_location',
+      'amc_first_met_date': 'first_met_date',
       'amc_networking_tags': 'tags',
       'amc_networking_notes': 'notes',
     };
 
-    const mobileField = propertyMapping[propertyName];
-    if (!mobileField) {
-      console.log('ℹ️  No mobile field mapping for:', propertyName);
+    const dbField = propertyMapping[propertyName];
+    if (!dbField) {
+      console.log('ℹ️  No database field mapping for:', propertyName);
       return;
     }
 
-    // Process the value for mobile app format
+    // Process the value
     let processedValue = propertyValue;
     if (propertyName === 'amc_networking_tags' && typeof propertyValue === 'string') {
       // Convert comma-separated string to array
       processedValue = propertyValue.split(',').map((tag: string) => tag.trim()).filter(Boolean);
     }
 
-    // Create/update sync queue record
-    const syncRecord = {
-      user_id: connection.user_id,
-      device_id: connection.users.mobile_device_id,
-      hubspot_contact_id: hubspotContactId,
-      property_name: mobileField,
-      property_value: JSON.stringify(processedValue),
-      change_type: 'property_update',
-      processed: false,
-      created_at: new Date().toISOString(),
-    };
+    // Update the contact
+    const { error: updateError } = await supabase
+      .from('contacts')
+      .update({
+        [dbField]: processedValue,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', contact.id);
 
-    // Try to insert into sync queue (create table if needed)
-    const { error: insertError } = await supabase
-      .from('hubspot_sync_queue')
-      .upsert(syncRecord, {
-        onConflict: 'user_id,hubspot_contact_id,property_name',
-        ignoreDuplicates: false
-      });
-
-    if (insertError) {
-      // If table doesn't exist, create it
-      if (insertError.code === '42P01') {
-        await createSyncQueueTable();
-        // Retry the insert
-        const { error: retryError } = await supabase
-          .from('hubspot_sync_queue')
-          .upsert(syncRecord);
-
-        if (retryError) {
-          throw retryError;
-        }
-      } else {
-        throw insertError;
-      }
+    if (updateError) {
+      console.error('❌ Failed to update contact:', updateError);
+      return;
     }
 
-    console.log(`✅ Queued sync: ${mobileField} = ${processedValue} for device ${connection.users.mobile_device_id}`);
+    console.log(`✅ Updated contact ${contact.first_name} ${contact.last_name}: ${dbField} = ${JSON.stringify(processedValue)}`);
 
   } catch (error) {
-    console.error('❌ Failed to queue contact sync:', error);
+    console.error('❌ Failed to update contact directly:', error);
   }
-}
-
-async function createSyncQueueTable() {
-  console.log('📋 Creating hubspot_sync_queue table...');
-
-  const createTableSQL = `
-    CREATE TABLE IF NOT EXISTS hubspot_sync_queue (
-      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-      device_id TEXT NOT NULL,
-      hubspot_contact_id TEXT NOT NULL,
-      property_name TEXT NOT NULL,
-      property_value JSONB,
-      change_type TEXT DEFAULT 'property_update',
-      processed BOOLEAN DEFAULT FALSE,
-      processed_at TIMESTAMP,
-      error_message TEXT,
-      created_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE(user_id, hubspot_contact_id, property_name)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_sync_queue_device_unprocessed
-    ON hubspot_sync_queue(device_id, processed)
-    WHERE processed = FALSE;
-  `;
-
-  const { error } = await supabase.rpc('exec_sql', { sql: createTableSQL });
-
-  if (error) {
-    console.error('❌ Failed to create sync queue table:', error);
-    throw error;
-  }
-
-  console.log('✅ Sync queue table created successfully');
 }
 
 async function handleContactCreation(event: any) {
