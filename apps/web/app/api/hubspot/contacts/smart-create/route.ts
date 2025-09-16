@@ -234,106 +234,68 @@ export async function POST(request: NextRequest) {
       // Contact exists - check ownership
       const hasOwner = existingContact.properties.hubspot_owner_id;
 
-      if (hasOwner) {
-        // Contact has owner - add networking note instead of changing ownership
-        console.log('Contact has owner, adding networking note');
+      // Always update the contact with any new information, regardless of ownership
+      console.log('Contact exists, updating with new information');
 
-        const networkingNote = `Additional networking contact made by ${userData.first_name} ${userData.last_name} (${userData.email})`;
-        const noteDetails = [];
+      const updateData: any = {
+        // Standard properties - only update if we have new data
+        firstname: contactData.name?.split(' ')[0] || existingContact.properties.firstname,
+        lastname: contactData.name?.split(' ').slice(1).join(' ') || existingContact.properties.lastname,
+        email: contactData.email || existingContact.properties.email,
+        phone: contactData.phone || existingContact.properties.phone,
+        company: contactData.company || existingContact.properties.company,
+        jobtitle: contactData.title || existingContact.properties.jobtitle,
 
-        if (contactData.firstMetLocation) noteDetails.push(`Location: ${contactData.firstMetLocation}`);
-        if (contactData.firstMetDate) noteDetails.push(`Date: ${contactData.firstMetDate}`);
-        if (contactData.notes) noteDetails.push(`Notes: ${contactData.notes}`);
-        if (contactData.tags) noteDetails.push(`Tags: ${Array.isArray(contactData.tags) ? contactData.tags.join(', ') : contactData.tags}`);
+        // Always update All My Circles properties with latest data
+        amc_first_met_location: contactData.firstMetLocation || undefined,
+        amc_first_met_date: contactData.firstMetDate || undefined,
+        amc_networking_tags: Array.isArray(contactData.tags) ? contactData.tags.join(', ') : contactData.tags,
+        amc_networking_notes: contactData.notes || undefined,
+      };
 
-        const fullNote = noteDetails.length > 0
-          ? `${networkingNote}\n\n${noteDetails.join('\n')}`
-          : networkingNote;
-
-        // Add engagement/note
-        try {
-          await fetch('https://api.hubapi.com/crm/v3/objects/notes', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${hubspotToken}`,
-            },
-            body: JSON.stringify({
-              properties: {
-                hs_note_body: fullNote,
-                hs_timestamp: new Date().toISOString(),
-                hubspot_owner_id: hasOwner
-              },
-              associations: [{
-                to: { id: existingContact.id },
-                types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 202 }]
-              }]
-            }),
-          });
-        } catch (noteError) {
-          console.warn('Failed to add networking note:', noteError);
-        }
-
-        return createApiResponse({
-          contactId: existingContact.id,
-          action: 'note_added',
-          message: 'Contact already exists with owner. Networking information added as note.',
-          existingOwner: hasOwner
-        });
-      } else {
-        // Contact exists but no owner - claim it and update properties
-        console.log('Contact exists but no owner, claiming and updating');
-
-        const updateData: any = {
-          firstname: contactData.name?.split(' ')[0] || undefined,
-          lastname: contactData.name?.split(' ').slice(1).join(' ') || undefined,
-          email: contactData.email || undefined,
-          phone: contactData.phone || undefined,
-          company: contactData.company || undefined,
-          jobtitle: contactData.title || undefined,
-          amc_first_met_location: contactData.firstMetLocation || undefined,
-          amc_first_met_date: contactData.firstMetDate || undefined,
-          amc_networking_tags: Array.isArray(contactData.tags) ? contactData.tags.join(', ') : contactData.tags,
-          amc_networking_notes: contactData.notes || undefined,
-        };
-
-        // Only set owner if we have the HubSpot user ID
-        if (hubspotUserId) {
-          updateData.hubspot_owner_id = hubspotUserId;
-        }
-
-        // Remove undefined values
-        Object.keys(updateData).forEach(key => {
-          if (updateData[key as keyof typeof updateData] === undefined) {
-            delete updateData[key as keyof typeof updateData];
-          }
-        });
-
-        const updateResponse = await fetch(
-          `https://api.hubapi.com/crm/v3/objects/contacts/${existingContact.id}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${hubspotToken}`,
-            },
-            body: JSON.stringify({ properties: updateData }),
-          }
-        );
-
-        if (!updateResponse.ok) {
-          const updateError = await updateResponse.json();
-          return createErrorResponse(`Failed to update contact: ${updateError.message}`, updateResponse.status);
-        }
-
-        const updatedContact = await updateResponse.json();
-        return createApiResponse({
-          contactId: updatedContact.id,
-          action: 'claimed_and_updated',
-          message: 'Existing unassigned contact claimed and updated with networking data.',
-          contact: updatedContact
-        });
+      // If no current owner and we have a HubSpot user ID, set ownership
+      if (!hasOwner && hubspotUserId) {
+        updateData.hubspot_owner_id = hubspotUserId;
       }
+
+      // Remove undefined values
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key as keyof typeof updateData] === undefined) {
+          delete updateData[key as keyof typeof updateData];
+        }
+      });
+
+      const updateResponse = await makeHubSpotApiCall(
+        `https://api.hubapi.com/crm/v3/objects/contacts/${existingContact.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ properties: updateData }),
+        },
+        hubspotToken,
+        userData.id
+      );
+
+      if (!updateResponse.ok) {
+        const updateError = await updateResponse.json();
+        return createErrorResponse(`Failed to update contact: ${updateError.message}`, updateResponse.status);
+      }
+
+      const updatedContact = await updateResponse.json();
+
+      const actionType = !hasOwner && hubspotUserId ? 'claimed_and_updated' : 'updated';
+      const message = !hasOwner && hubspotUserId
+        ? 'Existing unassigned contact claimed and updated with latest information.'
+        : 'Existing contact updated with latest information.';
+
+      return createApiResponse({
+        contactId: updatedContact.id,
+        action: actionType,
+        message: message,
+        contact: updatedContact
+      });
     } else {
       // Step 3: Create new contact with user as owner
       console.log('Creating new contact with user as owner');
@@ -374,6 +336,57 @@ export async function POST(request: NextRequest) {
 
       if (!createResponse.ok) {
         const createError = await createResponse.json();
+
+        // Check if this is a "contact already exists" error
+        if (createError.message && createError.message.includes('already exists')) {
+          console.log('Contact creation failed due to duplicate, attempting to find and update existing contact');
+
+          // Try to find the existing contact by email again (maybe case sensitivity issue)
+          if (contactData.email) {
+            try {
+              const fallbackSearchResponse = await makeHubSpotApiCall(
+                `https://api.hubapi.com/crm/v3/objects/contacts/search`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    filterGroups: [{
+                      filters: [{
+                        propertyName: 'email',
+                        operator: 'EQ',
+                        value: contactData.email // Try exact case this time
+                      }]
+                    }],
+                    properties: ['id', 'email', 'hubspot_owner_id', 'firstname', 'lastname'],
+                    limit: 1
+                  }),
+                },
+                hubspotToken,
+                userData.id
+              );
+
+              if (fallbackSearchResponse.ok) {
+                const fallbackResult = await fallbackSearchResponse.json();
+                if (fallbackResult.results && fallbackResult.results.length > 0) {
+                  const foundContact = fallbackResult.results[0];
+                  console.log('Found existing contact on fallback search:', foundContact.id);
+
+                  return createApiResponse({
+                    contactId: foundContact.id,
+                    action: 'found_existing',
+                    message: 'Contact already exists in HubSpot.',
+                    contact: foundContact
+                  });
+                }
+              }
+            } catch (fallbackError) {
+              console.warn('Fallback search failed:', fallbackError);
+            }
+          }
+        }
+
         return createErrorResponse(`Failed to create contact: ${createError.message}`, createResponse.status);
       }
 

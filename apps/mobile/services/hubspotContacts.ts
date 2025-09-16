@@ -270,6 +270,21 @@ class HubSpotContactsService {
 
       if (!response.ok) {
         devError('Smart HubSpot contact creation failed:', responseData);
+
+        // Check if this is an "already exists" error with an ID we can extract
+        const errorMessage = responseData.error || '';
+        const existingIdMatch = errorMessage.match(/Contact already exists\. Existing ID: (\d+)/);
+
+        if (existingIdMatch && existingIdMatch[1]) {
+          devLog('✅ Extracted existing HubSpot ID from error:', existingIdMatch[1]);
+          return {
+            success: true,
+            hubspotId: existingIdMatch[1],
+            action: 'existing_contact_found',
+            contact: { id: existingIdMatch[1] }
+          };
+        }
+
         return {
           success: false,
           error: responseData.error || `HTTP ${response.status}: ${response.statusText}`
