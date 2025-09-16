@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       try {
         await hubspotClient.crm.properties.groupsApi.create('contacts', {
           name: 'all_my_circles',
-          displayName: 'All My Circles',
+          label: 'All My Circles',
           displayOrder: 10
         });
         console.log('Created property group: all_my_circles');
