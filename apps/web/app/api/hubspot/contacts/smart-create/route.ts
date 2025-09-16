@@ -81,7 +81,8 @@ export async function POST(request: NextRequest) {
               console.log('Available users:', usersData.results?.map((u: any) => ({ id: u.id, email: u.email, userId: u.userId })));
             }
           } else {
-            console.warn('Could not retrieve HubSpot users list');
+            const errorText = await usersResponse.text();
+            console.warn('Could not retrieve HubSpot users list:', usersResponse.status, errorText);
           }
         } else {
           console.warn('Could not retrieve token info');
@@ -185,6 +186,12 @@ export async function POST(request: NextRequest) {
         console.log('Contact exists but no owner, claiming and updating');
 
         const updateData: any = {
+          firstname: contactData.name?.split(' ')[0] || undefined,
+          lastname: contactData.name?.split(' ').slice(1).join(' ') || undefined,
+          email: contactData.email || undefined,
+          phone: contactData.phone || undefined,
+          company: contactData.company || undefined,
+          jobtitle: contactData.title || undefined,
           amc_first_met_location: contactData.firstMetLocation || undefined,
           amc_first_met_date: contactData.firstMetDate || undefined,
           amc_networking_tags: Array.isArray(contactData.tags) ? contactData.tags.join(', ') : contactData.tags,
