@@ -70,7 +70,7 @@ export async function GET(
 ) {
   try {
     const deviceId = request.headers.get('x-device-id');
-    const { contactId } = params;
+    const contactId = params.contactId;
 
     if (!deviceId) {
       return createErrorResponse('Device ID required', 401);
