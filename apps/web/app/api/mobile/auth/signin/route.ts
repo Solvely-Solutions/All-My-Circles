@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (userError || !existingUser) {
+      console.error('User lookup error:', userError, 'for email:', email);
       return createErrorResponse('No user found with this email. Please sign up first.', 404);
     }
 
