@@ -72,7 +72,14 @@ class HubSpotSyncService {
       const contactsJson = await AsyncStorage.getItem('@circles/contacts');
       const localContacts: Contact[] = contactsJson ? JSON.parse(contactsJson) : [];
 
+      devLog(`📱 Found ${localContacts.length} total local contacts`);
+
       const hubspotContacts = localContacts.filter(c => c.hubspotContactId);
+
+      devLog(`🔗 Contacts with HubSpot IDs:`, hubspotContacts.map(c => ({
+        name: c.name,
+        hubspotContactId: c.hubspotContactId
+      })));
 
       if (hubspotContacts.length === 0) {
         devLog('ℹ️  No HubSpot-synced contacts found locally');
@@ -126,13 +133,22 @@ class HubSpotSyncService {
     }
 
     try {
+      const deviceId = await AsyncStorage.getItem('@allmycircles_device_id') || '';
+      devLog(`🔄 Checking contact ${localContact.name} (HubSpot ID: ${localContact.hubspotContactId})`);
+      devLog(`📱 Using device ID: ${deviceId.substring(0, 8)}...`);
+
+      const apiUrl = `${API_BASE_URL}/mobile/contacts/hubspot/${localContact.hubspotContactId}`;
+      devLog(`🌐 API URL: ${apiUrl}`);
+
       // Fetch fresh contact data from HubSpot
-      const response = await fetch(`${API_BASE_URL}/mobile/contacts/hubspot/${localContact.hubspotContactId}`, {
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'x-device-id': await AsyncStorage.getItem('@allmycircles_device_id') || '',
+          'x-device-id': deviceId,
         },
       });
+
+      devLog(`📡 API Response: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         if (response.status === 404) {
