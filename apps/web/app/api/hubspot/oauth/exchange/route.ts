@@ -215,23 +215,87 @@ export async function POST(request: NextRequest) {
 
     console.log('Successfully stored CRM connection, now creating custom properties...');
 
-    // Create custom properties for All My Circles
+    // Create custom properties directly via HubSpot API
     try {
-      const propertiesResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://all-my-circles-web-ltp4.vercel.app'}/api/hubspot/properties/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokens.access_token}`,
-        },
-      });
+      // First create the property group
+      try {
+        const groupResponse = await fetch('https://api.hubapi.com/crm/v3/properties/contacts/groups', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${tokens.access_token}`,
+          },
+          body: JSON.stringify({
+            name: 'allmycircles',
+            label: 'All My Circles',
+            displayOrder: -1
+          }),
+        });
 
-      if (propertiesResponse.ok) {
-        const propertiesResult = await propertiesResponse.json();
-        console.log('Custom properties created successfully:', propertiesResult);
-      } else {
-        const propertiesError = await propertiesResponse.text();
-        console.warn('Failed to create custom properties (non-fatal):', propertiesResponse.status, propertiesError);
+        if (groupResponse.ok) {
+          console.log('Property group "All My Circles" created successfully');
+        } else {
+          const groupError = await groupResponse.json();
+          if (groupError.category === 'VALIDATION_ERROR' && groupError.message?.includes('already exists')) {
+            console.log('Property group "All My Circles" already exists');
+          } else {
+            console.warn('Property group creation warning:', groupError);
+          }
+        }
+      } catch (groupError) {
+        console.warn('Property group creation error (non-fatal):', groupError);
       }
+
+      // Create the essential properties
+      const properties = [
+        {
+          name: 'amc_networking_notes',
+          label: 'Networking Notes',
+          description: 'Notes about networking interactions and relationship context',
+          groupName: 'allmycircles',
+          type: 'string',
+          fieldType: 'textarea'
+        },
+        {
+          name: 'amc_total_interactions',
+          label: 'Total Interactions',
+          description: 'Total number of interactions with this contact',
+          groupName: 'allmycircles',
+          type: 'number',
+          fieldType: 'number'
+        }
+      ];
+
+      let propertiesCreated = 0;
+      for (const property of properties) {
+        try {
+          const propResponse = await fetch('https://api.hubapi.com/crm/v3/properties/contacts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${tokens.access_token}`,
+            },
+            body: JSON.stringify(property),
+          });
+
+          if (propResponse.ok) {
+            console.log(`✅ Property "${property.name}" created successfully`);
+            propertiesCreated++;
+          } else {
+            const propError = await propResponse.json();
+            if (propError.category === 'VALIDATION_ERROR' && propError.message?.includes('already exists')) {
+              console.log(`✅ Property "${property.name}" already exists`);
+              propertiesCreated++;
+            } else {
+              console.warn(`❌ Property "${property.name}" creation failed:`, propError);
+            }
+          }
+        } catch (propError) {
+          console.warn(`❌ Property "${property.name}" error:`, propError);
+        }
+      }
+
+      console.log(`Custom properties setup complete: ${propertiesCreated}/${properties.length} properties ready`);
     } catch (propertiesError) {
       console.warn('Property creation failed (non-fatal):', propertiesError);
     }
