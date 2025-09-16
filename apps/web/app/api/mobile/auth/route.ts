@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
         .from('users')
         .insert({
           email,
+          first_name: firstName,
+          last_name: lastName,
           organization_id: organization.id
         })
         .select()
