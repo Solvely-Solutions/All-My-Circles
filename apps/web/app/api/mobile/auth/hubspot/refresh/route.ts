@@ -17,16 +17,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user by deviceId
+    // Find user by deviceId with debugging
+    console.log('Refresh endpoint called with deviceId:', deviceId);
+
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, organization_id')
+      .select('id, organization_id, mobile_device_id')
       .eq('mobile_device_id', deviceId)
       .single();
 
+    console.log('User lookup result:', { userData, userError });
+
     if (userError || !userData) {
+      // Try to find any users with device IDs for debugging
+      const { data: allUsers } = await supabase
+        .from('users')
+        .select('id, mobile_device_id')
+        .not('mobile_device_id', 'is', null)
+        .limit(5);
+
+      console.log('Available users with device IDs:', allUsers);
+
       return NextResponse.json(
-        { error: 'User not found' },
+        { error: 'User not found', debug: { deviceId, userError, availableDeviceIds: allUsers?.map(u => u.mobile_device_id) } },
         { status: 404 }
       );
     }
@@ -54,15 +67,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if token actually needs refreshing (expires within next 5 minutes)
+    // Check if token actually needs refreshing (expired or expires within next 5 minutes)
     const expiresAt = new Date(connectionData.expires_at);
     const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+    const now = new Date();
 
-    if (expiresAt > fiveMinutesFromNow) {
+    // Note: We'll force refresh anyway if requested since there might be a mismatch
+    // between stored expiration and actual token expiration
+    const shouldRefresh = expiresAt <= fiveMinutesFromNow;
+    const forceRefresh = request.headers.get('x-force-refresh') === 'true';
+
+    if (!shouldRefresh && !forceRefresh) {
+      // For debugging, still validate the token even if we think it's valid
+      try {
+        const validateResponse = await fetch(`https://api.hubapi.com/oauth/v1/refresh-tokens/${connectionData.refresh_token}`);
+        const validateData = await validateResponse.json();
+        console.log('Token validation for "valid" token:', validateResponse.status, validateData);
+      } catch (validateError) {
+        console.log('Token validation error:', validateError);
+      }
+
       return NextResponse.json({
         message: 'Token is still valid, no refresh needed',
-        expiresAt: connectionData.expires_at
+        expiresAt: connectionData.expires_at,
+        actualExpirationCheck: 'Use x-force-refresh header to force refresh'
       });
+    }
+
+    console.log('Token refresh needed:', {
+      expiresAt: connectionData.expires_at,
+      now: now.toISOString(),
+      isExpired: expiresAt < now
+    });
+
+    // First, validate the refresh token
+    try {
+      const validateResponse = await fetch(`https://api.hubapi.com/oauth/v1/refresh-tokens/${connectionData.refresh_token}`);
+      const validateData = await validateResponse.json();
+      console.log('Refresh token validation:', validateResponse.status, validateData);
+    } catch (validateError) {
+      console.log('Refresh token validation failed:', validateError);
     }
 
     // Refresh the token
@@ -81,9 +125,17 @@ export async function POST(request: NextRequest) {
 
     if (!refreshResponse.ok) {
       const errorData = await refreshResponse.text();
-      console.error('HubSpot token refresh failed:', errorData);
+      console.error('HubSpot token refresh failed:', {
+        status: refreshResponse.status,
+        statusText: refreshResponse.statusText,
+        error: errorData
+      });
       return NextResponse.json(
-        { error: 'Failed to refresh token' },
+        {
+          error: 'Failed to refresh token',
+          details: errorData,
+          status: refreshResponse.status
+        },
         { status: 400 }
       );
     }

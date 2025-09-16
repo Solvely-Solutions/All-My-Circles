@@ -1,4 +1,5 @@
 import { devLog, devError } from '../utils/logger';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface HubSpotContact {
   id?: string;
@@ -44,6 +45,79 @@ class HubSpotContactsService {
     this.accessToken = accessToken;
     this.portalId = portalId;
     devLog('HubSpot Contacts Service initialized for portal:', portalId);
+  }
+
+  /**
+   * Refresh the HubSpot access token when it expires
+   */
+  private async refreshAccessToken(): Promise<boolean> {
+    try {
+      const deviceId = await AsyncStorage.getItem('@allmycircles_device_id');
+      if (!deviceId) {
+        devError('Device ID not found, cannot refresh token');
+        return false;
+      }
+
+      const response = await fetch('https://all-my-circles-web-ltp4.vercel.app/api/mobile/auth/hubspot/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-force-refresh': 'true', // Force refresh to handle expiration time mismatches
+        },
+        body: JSON.stringify({ deviceId }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        devError('Token refresh failed:', response.status, errorText);
+        return false;
+      }
+
+      const data = await response.json();
+      devLog('Token refresh response:', data);
+
+      if (data.accessToken) {
+        this.accessToken = data.accessToken;
+        devLog('HubSpot token refreshed successfully');
+        return true;
+      }
+
+      devError('No access token in refresh response:', data);
+      return false;
+    } catch (error) {
+      devError('Token refresh error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Make an API call with automatic token refresh on expiration
+   */
+  private async makeAPICall(url: string, options: RequestInit, retryOnAuth = true): Promise<Response> {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${this.accessToken}`,
+      },
+    });
+
+    // If we get an authentication error and retryOnAuth is true, try to refresh the token
+    if (!response.ok && retryOnAuth) {
+      const responseData = await response.clone().json().catch(() => ({}));
+
+      if (responseData.category === 'EXPIRED_AUTHENTICATION' || response.status === 401) {
+        devLog('Token expired, attempting refresh...');
+
+        const refreshed = await this.refreshAccessToken();
+        if (refreshed) {
+          // Retry the original request with the new token
+          return this.makeAPICall(url, options, false); // Don't retry again to avoid infinite loop
+        }
+      }
+    }
+
+    return response;
   }
 
   /**
@@ -117,10 +191,9 @@ class HubSpotContactsService {
 
       devLog('Creating HubSpot contact:', hubspotContact);
 
-      const response = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
+      const response = await this.makeAPICall('https://api.hubapi.com/crm/v3/objects/contacts', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(hubspotContact),
@@ -214,10 +287,9 @@ class HubSpotContactsService {
 
       devLog('Updating HubSpot contact:', contactId, hubspotContact);
 
-      const response = await fetch(`https://api.hubapi.com/crm/v3/objects/contacts/${contactId}`, {
+      const response = await this.makeAPICall(`https://api.hubapi.com/crm/v3/objects/contacts/${contactId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(hubspotContact),
@@ -276,10 +348,9 @@ class HubSpotContactsService {
         ]
       };
 
-      const response = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/search', {
+      const response = await this.makeAPICall('https://api.hubapi.com/crm/v3/objects/contacts/search', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(searchBody),

@@ -11,16 +11,33 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Email and device ID are required', 400);
     }
 
-    // Check if user exists
-    const { data: existingUser, error: userError } = await supabase
+    // Check if user exists - handle multiple users with same email
+    // First try to find user with matching email and device ID
+    let { data: existingUser, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('email', email)
-      .single();
+      .eq('mobile_device_id', deviceId)
+      .maybeSingle();
 
-    if (userError || !existingUser) {
-      console.error('User lookup error:', userError, 'for email:', email);
-      return createErrorResponse('No user found with this email. Please sign up first.', 404);
+    // If no user found with device ID, try to find any user with this email
+    if (!existingUser) {
+      const { data: allUsers, error: allUsersError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .order('updated_at', { ascending: false });
+
+      if (allUsersError || !allUsers || allUsers.length === 0) {
+        console.error('User lookup error:', allUsersError, 'for email:', email);
+        return createErrorResponse('No user found with this email. Please sign up first.', 404);
+      }
+
+      // Prefer user with HubSpot connection, otherwise use most recently updated
+      const userWithHubSpot = allUsers.find(u => u.hubspot_user_id);
+      existingUser = userWithHubSpot || allUsers[0];
+
+      console.log(`Found ${allUsers.length} users with email ${email}, selected user:`, existingUser.id);
     }
 
     // Get organization
@@ -60,10 +77,11 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Failed to create session', 500);
     }
 
-    // Update user last active timestamp
+    // Update user last active timestamp and device ID
     await supabase
       .from('users')
       .update({
+        mobile_device_id: deviceId,
         last_active_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })

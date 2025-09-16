@@ -150,17 +150,30 @@ export async function POST(request: NextRequest) {
 
     console.log('Retrieved portal ID:', portalId);
 
-    // Find user by deviceId
+    // Find user by deviceId with debugging
+    console.log('OAuth exchange called with deviceId:', deviceId);
+
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, organization_id')
+      .select('id, organization_id, mobile_device_id, email')
       .eq('mobile_device_id', deviceId)
       .limit(1)
       .maybeSingle();
 
+    console.log('User lookup result:', { userData, userError });
+
     if (userError || !userData) {
+      // Try to find any users with device IDs for debugging
+      const { data: allUsers } = await supabase
+        .from('users')
+        .select('id, mobile_device_id, email')
+        .not('mobile_device_id', 'is', null)
+        .limit(5);
+
+      console.log('Available users with device IDs:', allUsers);
+
       return NextResponse.json(
-        { error: 'User not found' },
+        { error: 'User not found', debug: { deviceId, userError, availableDeviceIds: allUsers?.map(u => ({ id: u.id, deviceId: u.mobile_device_id, email: u.email })) } },
         { status: 404 }
       );
     }

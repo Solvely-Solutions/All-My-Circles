@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
           email,
           first_name: firstName,
           last_name: lastName,
-          organization_id: organization.id
+          organization_id: organization.id,
+          mobile_device_id: deviceId
         })
         .select()
         .single();
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
       const { data: updatedUser, error: updateError } = await supabase
         .from('users')
         .update({
+          mobile_device_id: deviceId,
           updated_at: new Date().toISOString()
         })
         .eq('id', existingUser.id)
