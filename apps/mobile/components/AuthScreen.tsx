@@ -113,9 +113,9 @@ export default function AuthScreen() {
 
   const handleSignIn = async () => {
     if (!email.trim() || !password.trim()) return;
-    
+
     try {
-      await signIn(email, password);
+      await signIn(email.trim(), password.trim());
     } catch (error) {
       // Handle error (in real app)
       devError('Sign in error', error instanceof Error ? error : new Error(String(error)));
@@ -124,17 +124,10 @@ export default function AuthScreen() {
 
   const handleSignUp = async () => {
     if (!email.trim() || !password.trim() || !firstName.trim() || !lastName.trim()) return;
-    
+
     setIsRegistering(true);
     try {
-      const deviceInfo = {
-        platform: Platform.OS,
-        model: 'Unknown', // Simplified since we removed expo-device
-        osVersion: Platform.Version?.toString() || 'Unknown'
-      };
-      
-      // Use our updated AuthContext signUp function with mock deviceId
-      await signUp(email.trim(), firstName.trim(), lastName.trim());
+      await signUp(email.trim(), password.trim(), firstName.trim(), lastName.trim());
     } catch (error) {
       devError('Sign up error', error instanceof Error ? error : new Error(String(error)));
     } finally {

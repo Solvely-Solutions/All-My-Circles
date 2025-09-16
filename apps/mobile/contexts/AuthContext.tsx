@@ -1,23 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiService } from '../services/apiService';
+import { supabase, isAuthenticated, getCurrentUser, getUserOrganization } from '../lib/supabase';
 import { devLog, devError } from '../utils/logger';
+import * as Device from 'expo-device';
 
 interface User {
   id: string;
+  authUserId: string;
   email: string;
   firstName: string;
   lastName: string;
   deviceId: string;
   organizationId: string;
-  sessionToken?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  signUp: (email: string, firstName: string, lastName: string) => Promise<void>;
-  signIn: (email: string) => Promise<void>;
+  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -27,7 +28,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const STORAGE_KEYS = {
   USER_DATA: '@allmycircles_user_data',
   DEVICE_ID: '@allmycircles_device_id',
-  SESSION_TOKEN: '@allmycircles_session_token'
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -36,25 +36,99 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     checkAuthState();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      devLog('Auth state changed:', event);
+      if (event === 'SIGNED_OUT' || !session) {
+        setUser(null);
+        await clearStoredAuth();
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        await handleAuthUser(session.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  const generateDeviceId = async (): Promise<string> => {
+    // Try to get existing device ID
+    let deviceId = await AsyncStorage.getItem(STORAGE_KEYS.DEVICE_ID);
+    if (deviceId) return deviceId;
+
+    // Generate new device ID
+    if (Device.isDevice) {
+      deviceId = Device.osInternalBuildId || `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    } else {
+      deviceId = `simulator_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    await AsyncStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
+    return deviceId;
+  };
+
+  const handleAuthUser = async (authUserId: string) => {
+    try {
+      // Get user organization
+      const organization = await getUserOrganization(authUserId);
+      if (!organization) {
+        devError('No organization found for user');
+        return;
+      }
+
+      // Make API call to get user profile from server
+      const deviceId = await generateDeviceId();
+      const response = await fetch('https://all-my-circles-web-ltp4.vercel.app/api/mobile/auth/profile', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'x-device-id': deviceId,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get user profile');
+      }
+
+      const userData = await response.json();
+
+      const user: User = {
+        id: userData.user.id,
+        authUserId: userData.user.authUserId,
+        email: userData.user.email,
+        firstName: userData.user.firstName,
+        lastName: userData.user.lastName,
+        deviceId,
+        organizationId: userData.user.organizationId,
+      };
+
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+      setUser(user);
+      devLog('User profile loaded');
+    } catch (error) {
+      devError('Error loading user profile', error instanceof Error ? error : new Error(String(error)));
+    }
+  };
 
   const checkAuthState = async () => {
     setIsLoading(true);
     try {
-      const [userData, deviceId, sessionToken] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.USER_DATA),
-        AsyncStorage.getItem(STORAGE_KEYS.DEVICE_ID),
-        AsyncStorage.getItem(STORAGE_KEYS.SESSION_TOKEN)
-      ]);
+      // Check if user is authenticated with Supabase
+      const authenticated = await isAuthenticated();
 
-      if (userData && deviceId) {
-        const parsedUser = JSON.parse(userData);
-        await apiService.initialize(deviceId);
-
-        // For now, just restore the user without API verification
-        // TODO: Implement proper session verification when getDeviceStatus API is ready
-        setUser(parsedUser);
-        devLog('User restored from storage');
+      if (authenticated) {
+        const currentUser = await getCurrentUser();
+        if (currentUser) {
+          await handleAuthUser(currentUser.id);
+        }
+      } else {
+        // Try to restore from local storage (fallback)
+        const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
+        if (userData) {
+          const parsedUser = JSON.parse(userData);
+          setUser(parsedUser);
+          devLog('User restored from storage (fallback)');
+        }
       }
     } catch (error) {
       devError('Error checking auth state', error instanceof Error ? error : new Error(String(error)));
@@ -69,69 +143,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.multiRemove([
         STORAGE_KEYS.USER_DATA,
         STORAGE_KEYS.DEVICE_ID,
-        STORAGE_KEYS.SESSION_TOKEN
       ]);
     } catch (error) {
       devError('Error clearing stored auth', error instanceof Error ? error : new Error(String(error)));
     }
   };
 
-  const signUp = async (email: string, firstName: string, lastName: string) => {
-    devLog('🚀 NEW SIGNUP FUNCTION LOADED - VERSION 2.0 🚀');
-    devLog('signUp function called with:', { email, firstName, lastName });
+  const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
     setIsLoading(true);
     try {
-      // Generate a foolproof device ID for simulator
-      const deviceId = 'simulator-test-123';
-      devLog('✅ Generated device ID:', deviceId);
+      const deviceId = await generateDeviceId();
 
-      // Store it for future use
-      try {
-        await AsyncStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
-        devLog('Device ID stored successfully');
-      } catch (storageError) {
-        devError('Failed to store device ID:', storageError instanceof Error ? storageError : new Error(String(storageError)));
-        // Continue anyway since we have the deviceId in memory
+      // Call the server registration endpoint
+      const response = await fetch('https://all-my-circles-web-ltp4.vercel.app/api/mobile/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          firstName,
+          lastName,
+          deviceId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
       }
 
-      devLog('About to initialize API service with deviceId:', deviceId);
-      devLog('typeof deviceId:', typeof deviceId);
-      devLog('deviceId length:', deviceId?.length);
+      // After successful registration, sign in with Supabase
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (!deviceId) {
-        throw new Error('Device ID is null or undefined - this should not happen!');
+      if (signInError) {
+        throw new Error(signInError.message);
       }
 
-      devLog('Calling apiService.initialize...');
-      await apiService.initialize(deviceId);
-      devLog('apiService.initialize completed');
-
-      const deviceInfo = {
-        firstName,
-        lastName,
-        platform: 'ios',
-        model: 'iPhone Simulator',
-        osVersion: '18.0'
-      };
-
-      const userData = await apiService.registerDevice(email, deviceInfo);
-
-      const user: User = {
-        id: userData.user.id,
-        email: userData.user.email, // Use email from response
-        firstName,
-        lastName,
-        deviceId,
-        organizationId: userData.user.organizationId,
-        sessionToken: userData.authentication?.sessionToken
-      };
-
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
-      if (userData.authentication?.sessionToken) {
-        await AsyncStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, userData.authentication.sessionToken);
-      }
-
-      setUser(user);
       devLog('User signed up successfully');
     } catch (error) {
       devError('Sign up failed', error instanceof Error ? error : new Error(String(error)));
@@ -141,47 +194,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signIn = async (email: string) => {
+  const signIn = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Try to get stored device ID, or generate a new one
-      let deviceId = await AsyncStorage.getItem(STORAGE_KEYS.DEVICE_ID);
-      if (!deviceId) {
-        deviceId = 'simulator-test-123';
-        await AsyncStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
+      const deviceId = await generateDeviceId();
+
+      // Sign in with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        throw new Error(authError.message);
       }
 
-      // Initialize API service
-      await apiService.initialize(deviceId);
-
-      // Try to authenticate with the server using existing email and device
-      // This will create a session if the user exists, or fail if they don't
-      const deviceInfo = {
-        firstName: '', // These will be filled from server response
-        lastName: '',
-        platform: 'ios',
-        model: 'iPhone Simulator',
-        osVersion: '18.0'
-      };
-
-      const userData = await apiService.signIn(email, deviceInfo);
-
-      const user: User = {
-        id: userData.user.id,
-        email: userData.user.email,
-        firstName: userData.user.firstName || '',
-        lastName: userData.user.lastName || '',
-        deviceId,
-        organizationId: userData.user.organizationId,
-        sessionToken: userData.authentication?.sessionToken
-      };
-
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
-      if (userData.authentication?.sessionToken) {
-        await AsyncStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, userData.authentication.sessionToken);
+      if (!authData.user) {
+        throw new Error('Sign in failed');
       }
 
-      setUser(user);
+      // Call server signin endpoint to update device info
+      const response = await fetch('https://all-my-circles-web-ltp4.vercel.app/api/mobile/auth/signin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          deviceId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Server authentication failed');
+      }
+
       devLog('User signed in successfully');
     } catch (error) {
       devError('Sign in failed', error instanceof Error ? error : new Error(String(error)));
@@ -193,6 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      await supabase.auth.signOut();
       await clearStoredAuth();
       setUser(null);
       devLog('User signed out');
