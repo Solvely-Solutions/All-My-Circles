@@ -246,23 +246,39 @@ export async function POST(request: NextRequest) {
         console.warn('Property group creation error (non-fatal):', groupError);
       }
 
-      // Create the essential properties
+      // Create the essential networking properties
       const properties = [
         {
-          name: 'amc_networking_notes',
-          label: 'Networking Notes',
-          description: 'Notes about networking interactions and relationship context',
+          name: 'amc_first_met_location',
+          label: 'First Met Location',
+          description: 'Where you first met this contact (conference, event, etc.)',
+          groupName: 'allmycircles',
+          type: 'string',
+          fieldType: 'text'
+        },
+        {
+          name: 'amc_first_met_date',
+          label: 'First Met Date',
+          description: 'When you first met this contact',
+          groupName: 'allmycircles',
+          type: 'date',
+          fieldType: 'date'
+        },
+        {
+          name: 'amc_networking_tags',
+          label: 'Networking Tags',
+          description: 'Tags associated with this contact (comma-separated)',
           groupName: 'allmycircles',
           type: 'string',
           fieldType: 'textarea'
         },
         {
-          name: 'amc_total_interactions',
-          label: 'Total Interactions',
-          description: 'Total number of interactions with this contact',
+          name: 'amc_networking_notes',
+          label: 'Networking Notes',
+          description: 'Meeting context, conversation topics, business opportunities discussed',
           groupName: 'allmycircles',
-          type: 'number',
-          fieldType: 'number'
+          type: 'string',
+          fieldType: 'textarea'
         }
       ];
 
@@ -295,7 +311,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      console.log(`Custom properties setup complete: ${propertiesCreated}/${properties.length} properties ready`);
+      console.log(`Essential networking properties setup complete: ${propertiesCreated}/${properties.length} properties ready`);
     } catch (propertiesError) {
       console.warn('Property creation failed (non-fatal):', propertiesError);
     }

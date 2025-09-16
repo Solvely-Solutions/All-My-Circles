@@ -1,0 +1,47 @@
+{
+  "uid": "app-AllMyCirclesforHubSpot",
+  "type": "app",
+  "config": {
+    "description": "Seamlessly sync contacts from networking events and conferences into HubSpot. Track relationship strength, schedule follow-ups, and convert connections into deals.",
+    "name": "All My Circles for HubSpot",
+    "distribution": "private",
+    "auth": {
+      "type": "oauth",
+      "redirectUrls": [
+        "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/oauth-callback"
+      ],
+      "requiredScopes": [
+        "crm.objects.contacts.read",
+        "crm.objects.contacts.write",
+        "crm.objects.companies.read",
+        "crm.objects.companies.write",
+        "crm.objects.deals.read",
+        "crm.objects.deals.write",
+        "crm.schemas.custom.read",
+        "crm.schemas.custom.write",
+        "integration-sync"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": [
+        "https://api.hubapi.com",
+        "https://api.solvely.com",
+        "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/contact-networking",
+        "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/dashboard",
+        "https://all-my-circles-web-ltp4.vercel.app/api/sync/hubspot",
+        "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/properties/create",
+        "https://all-my-circles-web-ltp4.vercel.app/api/hubspot/webhooks"
+      ],
+      "iframe": [],
+      "img": []
+    },
+    "support": {
+      "supportEmail": "support@solvely.com",
+      "documentationUrl": "https://docs.solvely.com/circles/hubspot-integration",
+      "supportUrl": "https://support.solvely.com",
+      "supportPhone": "+18005557638"
+    }
+  }
+}
