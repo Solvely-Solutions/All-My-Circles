@@ -3,6 +3,7 @@ import { Contact, ContactGroup } from '../types/contact';
 import { apiService } from './apiService';
 import { hubspotContactsService } from './hubspotContacts';
 import { crmService } from './crmService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface SyncResult {
   success: boolean;
@@ -98,8 +99,27 @@ class SyncService {
     console.log('Processing add contact:', payload);
 
     try {
-      await apiService.createContact(payload);
+      const response = await apiService.createContact(payload);
       console.log('Successfully synced contact to backend and HubSpot');
+
+      // If the API returned a HubSpot contact ID, update the local contact
+      if (response?.contact?.hubspotContactId) {
+        console.log('Updating local contact with HubSpot ID:', response.contact.hubspotContactId);
+
+        // Update the local contact with the HubSpot ID
+        const contactsJson = await AsyncStorage.getItem('@circles/contacts');
+        const contacts: Contact[] = contactsJson ? JSON.parse(contactsJson) : [];
+
+        const contactIndex = contacts.findIndex(c => c.id === payload.id);
+        if (contactIndex !== -1) {
+          contacts[contactIndex].hubspotContactId = response.contact.hubspotContactId;
+          contacts[contactIndex].syncStatus = 'synced';
+          contacts[contactIndex].lastSyncedAt = new Date().toISOString();
+
+          await AsyncStorage.setItem('@circles/contacts', JSON.stringify(contacts));
+          console.log('Local contact updated with HubSpot ID successfully');
+        }
+      }
     } catch (error) {
       console.error('Failed to sync contact:', error);
       throw new Error(`Failed to add contact: ${error instanceof Error ? error.message : 'Unknown error'}`);

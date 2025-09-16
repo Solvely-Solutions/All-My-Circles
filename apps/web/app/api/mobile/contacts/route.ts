@@ -95,6 +95,9 @@ export async function POST(request: NextRequest) {
           .from('contacts')
           .update({ hubspot_contact_id: hubspotContact.id })
           .eq('id', contact.id);
+
+        // Update our local contact object to include the new HubSpot ID
+        contact.hubspot_contact_id = hubspotContact.id;
       }
 
       console.log('Contact synced to HubSpot:', hubspotContact?.id);
@@ -114,7 +117,7 @@ export async function POST(request: NextRequest) {
         title: contact.job_title,
         notes: contact.notes,
         tags: contact.tags,
-        hubspotContactId: contact.hubspot_contact_id,
+        hubspotContactId: contact.hubspot_contact_id, // This will now include the newly assigned HubSpot ID
         createdAt: contact.created_at
       }
     });
