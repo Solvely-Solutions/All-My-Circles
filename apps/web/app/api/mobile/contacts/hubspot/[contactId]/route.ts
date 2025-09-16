@@ -68,10 +68,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { contactId: string } }
 ) {
-  try {
-    const deviceId = request.headers.get('x-device-id');
-    const contactId = params.contactId;
+  const deviceId = request.headers.get('x-device-id');
+  const contactId = params.contactId;
 
+  try {
     if (!deviceId) {
       return createErrorResponse('Device ID required', 401);
     }
