@@ -69,42 +69,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleAuthUser = async (authUserId: string) => {
     try {
-      // Get user organization
-      const organization = await getUserOrganization(authUserId);
-      if (!organization) {
-        devError('No organization found for user');
-        return;
-      }
-
-      // Make API call to get user profile from server
       const deviceId = await generateDeviceId();
-      const response = await fetch('https://all-my-circles-web-ltp4.vercel.app/api/mobile/auth/profile', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          'x-device-id': deviceId,
-        },
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to get user profile');
+      // Try to get user profile from server first
+      try {
+        const response = await fetch('https://all-my-circles-web-ltp4.vercel.app/api/mobile/auth/profile', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'x-device-id': deviceId,
+          },
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          const user: User = {
+            id: userData.user.id,
+            authUserId: userData.user.authUserId,
+            email: userData.user.email,
+            firstName: userData.user.firstName,
+            lastName: userData.user.lastName,
+            deviceId,
+            organizationId: userData.user.organizationId,
+          };
+
+          await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+          setUser(user);
+          devLog('User profile loaded from server');
+          return;
+        }
+      } catch (profileError) {
+        devLog('Profile API failed, falling back to Supabase auth data');
       }
 
-      const userData = await response.json();
+      // Fallback: Create user object from Supabase auth data
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        const user: User = {
+          id: authUser.id, // Use auth user ID as fallback
+          authUserId: authUser.id,
+          email: authUser.email || '',
+          firstName: authUser.user_metadata?.first_name || '',
+          lastName: authUser.user_metadata?.last_name || '',
+          deviceId,
+          organizationId: '', // Will be set later when backend is fully set up
+        };
 
-      const user: User = {
-        id: userData.user.id,
-        authUserId: userData.user.authUserId,
-        email: userData.user.email,
-        firstName: userData.user.firstName,
-        lastName: userData.user.lastName,
-        deviceId,
-        organizationId: userData.user.organizationId,
-      };
-
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
-      setUser(user);
-      devLog('User profile loaded');
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+        setUser(user);
+        devLog('User authenticated with fallback data');
+      }
     } catch (error) {
       devError('Error loading user profile', error instanceof Error ? error : new Error(String(error)));
     }

@@ -13,17 +13,23 @@ import {
   hubspot
 } from '@hubspot/ui-extensions';
 
-hubspot.extend(({ context, runServerlessFunction, objectId, objectType }) => {
-  return <NetworkingCard objectId={objectId} objectType={objectType} />;
+hubspot.extend(({ context }) => {
+  return <NetworkingCard context={context} />;
 });
 
-const NetworkingCard = ({ objectId, objectType }) => {
+const NetworkingCard = ({ context }) => {
   const [loading, setLoading] = useState(true);
   const [networkingData, setNetworkingData] = useState(null);
   const [error, setError] = useState(null);
 
+  // Extract objectId from context
+  const objectId = context?.crm?.objectId;
+  const objectType = context?.crm?.objectType || 'contact';
+
   useEffect(() => {
-    fetchNetworkingData();
+    if (objectId) {
+      fetchNetworkingData();
+    }
   }, [objectId]);
 
   const fetchNetworkingData = async () => {
@@ -31,19 +37,14 @@ const NetworkingCard = ({ objectId, objectType }) => {
       setLoading(true);
       setError(null);
 
-      // Add timeout to prevent hanging requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      if (!objectId) {
+        throw new Error('Contact ID not available');
+      }
 
       // Fetch real networking data from API
       const response = await hubspot.fetch(
-        `https://all-my-circles-web-ltp4.vercel.app/api/hubspot/contact-networking?contact_id=${objectId}`,
-        {
-          signal: controller.signal
-        }
+        `https://all-my-circles-web-ltp4.vercel.app/api/hubspot/contact-networking?contact_id=${objectId}`
       );
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
@@ -85,9 +86,7 @@ const NetworkingCard = ({ objectId, objectType }) => {
 
       let errorMessage = 'Failed to load networking information';
 
-      if (err.name === 'AbortError') {
-        errorMessage = 'Request timeout - please try again';
-      } else if (err.message) {
+      if (err.message) {
         errorMessage = err.message;
       }
 
@@ -125,6 +124,15 @@ const NetworkingCard = ({ objectId, objectType }) => {
       return dateString;
     }
   };
+
+  // Show loading state until we have an objectId
+  if (!objectId) {
+    return (
+      <Alert title="Unable to Load Contact" variant="warning">
+        <Text>Contact information is not available. Please refresh the page.</Text>
+      </Alert>
+    );
+  }
 
   if (loading) {
     return (

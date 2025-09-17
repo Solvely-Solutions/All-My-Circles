@@ -54,7 +54,7 @@ export const getUserOrganization = async (userId: string) => {
       .single();
 
     if (userError || !userRecord) {
-      devError('Error getting user record', userError);
+      devLog('No user record found - this is expected for new auth system');
       return null;
     }
 
@@ -72,7 +72,7 @@ export const getUserOrganization = async (userId: string) => {
 
     return organization;
   } catch (error) {
-    devError('Error getting user organization', error instanceof Error ? error : new Error(String(error)));
+    devLog('Error getting user organization - this is expected for new auth system');
     return null;
   }
 };
