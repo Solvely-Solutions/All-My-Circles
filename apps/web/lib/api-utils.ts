@@ -52,7 +52,12 @@ export async function getAuthContext(request: NextRequest): Promise<AuthContext>
   const deviceId = request.headers.get('x-device-id');
   const portalId = request.cookies.get('hubspot_portal_id')?.value;
 
-  if (!deviceId && !portalId) {
+  // Check for HubSpot custom card authentication via query parameters
+  const { searchParams } = request.nextUrl;
+  const queryPortalId = searchParams.get('portalId');
+  const queryAppId = searchParams.get('appId');
+
+  if (!deviceId && !portalId && !queryPortalId) {
     throw new Error('Authentication required');
   }
 
@@ -93,11 +98,24 @@ export async function getAuthContext(request: NextRequest): Promise<AuthContext>
       .select('id')
       .eq('hubspot_portal_id', parseInt(portalId))
       .single();
-    
+
     if (error || !org) {
       throw new Error('Organization not found');
     }
-    
+
+    organizationId = org.id;
+  } else if (queryPortalId) {
+    // HubSpot custom card authentication via query parameters
+    const { data: org, error } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('hubspot_portal_id', parseInt(queryPortalId))
+      .single();
+
+    if (error || !org) {
+      throw new Error('Organization not found');
+    }
+
     organizationId = org.id;
   } else {
     throw new Error('No valid authentication method found');
@@ -187,12 +205,23 @@ export function createErrorResponse(message: string, status: number = 500) {
 export async function withAuth<T>(
   request: NextRequest,
   handler: (authContext: AuthContext, request: NextRequest) => Promise<T>
-): Promise<T> {
+): Promise<T | Response> {
   try {
     const authContext = await getAuthContext(request);
     return await handler(authContext, request);
   } catch (error) {
-    throw error;
+    console.error('Auth error:', error);
+
+    if (error instanceof Error) {
+      if (error.message.includes('Authentication required')) {
+        return createErrorResponse('Authentication required', 401);
+      }
+      if (error.message.includes('not found') || error.message.includes('not authorized')) {
+        return createErrorResponse('Access denied', 403);
+      }
+    }
+
+    return createErrorResponse('Authentication failed', 500);
   }
 }
 

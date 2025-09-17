@@ -1,119 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiResponse, createErrorResponse, supabase } from '../../../../lib/api-utils';
-import { randomBytes } from 'crypto';
 
-// POST /api/mobile/auth - Register/authenticate mobile device
+// POST /api/mobile/auth - Register new user with Supabase Auth
 export async function POST(request: NextRequest) {
   try {
-    const { email, deviceId, deviceInfo, firstName, lastName } = await request.json();
+    const { email, password, firstName, lastName, deviceId } = await request.json();
 
-    if (!email || !deviceId) {
-      return createErrorResponse('Email and device ID are required', 400);
+    if (!email || !password || !deviceId) {
+      return createErrorResponse('Email, password, and device ID are required', 400);
     }
 
-    // Check if user exists
-    let { data: existingUser } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
+    if (!firstName || !lastName) {
+      return createErrorResponse('First name and last name are required', 400);
+    }
+
+    // Create user with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm email for demo
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+        device_id: deviceId
+      }
+    });
+
+    if (authError) {
+      console.error('Supabase auth error:', authError);
+      if (authError.message.includes('already registered')) {
+        return createErrorResponse('User already exists. Please sign in instead.', 409);
+      }
+      return createErrorResponse(authError.message || 'Failed to create user', 400);
+    }
+
+    if (!authData.user) {
+      return createErrorResponse('Failed to create user', 500);
+    }
+
+    // Create organization for the user
+    const { data: newOrg, error: orgError } = await supabase
+      .from('organizations')
+      .insert({
+        name: `${firstName} ${lastName}'s Organization`
+      })
+      .select()
       .single();
 
-    let organization;
-
-    if (!existingUser) {
-      // Create new organization and user
-      const { data: newOrg, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: `${email.split('@')[0]}'s Organization`
-        })
-        .select()
-        .single();
-
-      if (orgError) {
-        console.error('Organization creation error:', orgError);
-        return createErrorResponse('Failed to create organization', 500);
-      }
-
-      organization = newOrg;
-
-      // Create user
-      const { data: newUser, error: userError } = await supabase
-        .from('users')
-        .insert({
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          organization_id: organization.id,
-          mobile_device_id: deviceId
-        })
-        .select()
-        .single();
-
-      if (userError) {
-        console.error('User creation error:', userError);
-        return createErrorResponse('Failed to create user', 500);
-      }
-
-      existingUser = newUser;
-    } else {
-      // Update existing user's device info
-      const { data: updatedUser, error: updateError } = await supabase
-        .from('users')
-        .update({
-          mobile_device_id: deviceId,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingUser.id)
-        .select()
-        .single();
-
-      if (updateError) {
-        console.error('User update error:', updateError);
-        return createErrorResponse('Failed to update user', 500);
-      }
-
-      existingUser = updatedUser;
-
-      // Get organization
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('*')
-        .eq('id', existingUser.organization_id)
-        .single();
-
-      organization = org;
+    if (orgError) {
+      console.error('Organization creation error:', orgError);
+      return createErrorResponse('Failed to create organization', 500);
     }
 
-    // Generate a session token for API access (simple random string for demo)
-    const sessionToken = randomBytes(32).toString('hex');
-
-    // Store session (in a real app, you'd use a proper session store)
-    await supabase
-      .from('user_sessions')
+    // Create user record in our custom users table
+    const { data: newUser, error: userError } = await supabase
+      .from('users')
       .insert({
-        user_id: existingUser.id,
-        session_token: sessionToken,
-        device_id: deviceId,
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-        is_active: true
-      });
+        auth_user_id: authData.user.id,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        organization_id: newOrg.id,
+        mobile_device_id: deviceId
+      })
+      .select()
+      .single();
+
+    if (userError) {
+      console.error('User creation error:', userError);
+      // Clean up auth user if we failed to create the profile
+      await supabase.auth.admin.deleteUser(authData.user.id);
+      return createErrorResponse('Failed to create user profile', 500);
+    }
 
     return createApiResponse({
       user: {
-        id: existingUser.id,
-        email: existingUser.email,
-        organizationId: existingUser.organization_id
+        id: newUser.id,
+        authUserId: authData.user.id,
+        email: newUser.email,
+        firstName: newUser.first_name,
+        lastName: newUser.last_name,
+        organizationId: newUser.organization_id
       },
       organization: {
-        id: organization.id,
-        name: organization.name
+        id: newOrg.id,
+        name: newOrg.name
       },
-      authentication: {
-        deviceId,
-        sessionToken,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-      }
+      message: 'User registered successfully'
     }, 201);
 
   } catch (error) {

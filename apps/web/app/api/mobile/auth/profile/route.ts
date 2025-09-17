@@ -1,43 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiResponse, createErrorResponse, supabase } from '../../../../../lib/api-utils';
 
-// POST /api/mobile/auth/signin - Sign in existing user with Supabase Auth
-export async function POST(request: NextRequest) {
+// GET /api/mobile/auth/profile - Get user profile from auth token
+export async function GET(request: NextRequest) {
   try {
-    const { email, password, deviceId } = await request.json();
+    const authHeader = request.headers.get('authorization');
+    const deviceId = request.headers.get('x-device-id');
 
-    if (!email || !password || !deviceId) {
-      return createErrorResponse('Email, password, and device ID are required', 400);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return createErrorResponse('Authorization token required', 401);
     }
 
-    // Authenticate user with Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError) {
-      console.error('Supabase auth error:', authError);
-      if (authError.message.includes('Invalid login credentials')) {
-        return createErrorResponse('Invalid email or password', 401);
-      }
-      return createErrorResponse(authError.message || 'Sign in failed', 400);
+    if (!deviceId) {
+      return createErrorResponse('Device ID required', 400);
     }
 
-    if (!authData.user) {
-      return createErrorResponse('Sign in failed', 500);
+    const accessToken = authHeader.replace('Bearer ', '');
+
+    // Verify the token with Supabase
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(accessToken);
+
+    if (authError || !authUser) {
+      console.error('Auth verification error:', authError);
+      return createErrorResponse('Invalid or expired token', 401);
     }
 
     // Get user record from our custom users table
     const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('*')
-      .eq('auth_user_id', authData.user.id)
+      .eq('auth_user_id', authUser.id)
       .single();
 
     if (userError || !userRecord) {
       console.error('User lookup error:', userError);
-      return createErrorResponse('User profile not found. Please contact support.', 404);
+      return createErrorResponse('User profile not found', 404);
     }
 
     // Update user's device ID and last active timestamp
@@ -64,7 +61,7 @@ export async function POST(request: NextRequest) {
     return createApiResponse({
       user: {
         id: userRecord.id,
-        authUserId: authData.user.id,
+        authUserId: authUser.id,
         email: userRecord.email,
         firstName: userRecord.first_name,
         lastName: userRecord.last_name,
@@ -73,19 +70,13 @@ export async function POST(request: NextRequest) {
       organization: {
         id: organization.id,
         name: organization.name
-      },
-      session: {
-        access_token: authData.session?.access_token,
-        refresh_token: authData.session?.refresh_token,
-        expires_at: authData.session?.expires_at
-      },
-      message: 'Signed in successfully'
-    }, 200);
+      }
+    });
 
   } catch (error) {
-    console.error('Mobile signin error:', error);
+    console.error('Profile fetch error:', error);
     return createErrorResponse(
-      error instanceof Error ? error.message : 'Sign in failed',
+      error instanceof Error ? error.message : 'Failed to fetch profile',
       500
     );
   }
