@@ -42,7 +42,9 @@ export async function POST(request: NextRequest) {
     const { data: newOrg, error: orgError } = await supabase
       .from('organizations')
       .insert({
-        name: `${firstName} ${lastName}'s Organization`
+        name: `${firstName} ${lastName}'s Organization`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .select()
       .single();
@@ -61,7 +63,9 @@ export async function POST(request: NextRequest) {
         first_name: firstName,
         last_name: lastName,
         organization_id: newOrg.id,
-        mobile_device_id: deviceId
+        mobile_device_id: deviceId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .select()
       .single();
@@ -73,7 +77,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Failed to create user profile', 500);
     }
 
-    return createApiResponse({
+    return NextResponse.json({
       user: {
         id: newUser.id,
         authUserId: authData.user.id,
@@ -87,7 +91,7 @@ export async function POST(request: NextRequest) {
         name: newOrg.name
       },
       message: 'User registered successfully'
-    }, 201);
+    }, { status: 201 });
 
   } catch (error) {
     console.error('Mobile auth error:', error);
