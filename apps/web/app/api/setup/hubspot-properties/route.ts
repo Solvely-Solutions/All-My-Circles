@@ -64,16 +64,11 @@ export async function GET(request: NextRequest) {
       }
 
       const expectedProperties = [
-        'amc_connection_strength',
-        'amc_contact_value', 
-        'amc_first_met_location',
         'amc_first_met_date',
-        'amc_networking_tags',
+        'amc_first_met_location',
         'amc_networking_notes',
-        'amc_last_interaction_date',
-        'amc_next_followup_date',
-        'amc_total_interactions',
-        'amc_contact_id'
+        'amc_networking_tags',
+        'amc_total_interactions'
       ];
 
       const setupProperties = properties?.map(p => p.property_name) || [];

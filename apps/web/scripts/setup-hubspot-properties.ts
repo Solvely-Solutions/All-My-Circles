@@ -27,91 +27,41 @@ interface CustomProperty {
 
 const networkingProperties: CustomProperty[] = [
   {
-    name: 'amc_connection_strength',
-    label: 'AMC Connection Strength',
-    description: 'How strong is your relationship with this contact (All My Circles)',
-    groupName: 'all_my_circles_information',
-    type: 'enumeration',
-    fieldType: 'select',
-    options: [
-      { label: 'Weak', value: 'weak', description: 'Just met or minimal interaction' },
-      { label: 'Medium', value: 'medium', description: 'Had meaningful conversations' },
-      { label: 'Strong', value: 'strong', description: 'Close relationship, regular contact' }
-    ]
-  },
-  {
-    name: 'amc_contact_value',
-    label: 'AMC Contact Value',
-    description: 'Potential value of this networking relationship (All My Circles)',
-    groupName: 'all_my_circles_information',
-    type: 'enumeration',
-    fieldType: 'select',
-    options: [
-      { label: 'Low', value: 'low', description: 'Limited networking value' },
-      { label: 'Medium', value: 'medium', description: 'Good networking potential' },
-      { label: 'High', value: 'high', description: 'High-value connection' }
-    ]
-  },
-  {
-    name: 'amc_first_met_location',
-    label: 'AMC First Met Location',
-    description: 'Where you first met this contact (All My Circles)',
-    groupName: 'all_my_circles_information',
-    type: 'string',
-    fieldType: 'text'
-  },
-  {
     name: 'amc_first_met_date',
-    label: 'AMC First Met Date',
+    label: 'First Met Date',
     description: 'When you first met this contact (All My Circles)',
     groupName: 'all_my_circles_information',
     type: 'date',
     fieldType: 'date'
   },
   {
-    name: 'amc_networking_tags',
-    label: 'AMC Networking Tags',
-    description: 'Tags to categorize this contact (All My Circles, comma-separated)',
+    name: 'amc_first_met_location',
+    label: 'First Met Location',
+    description: 'Where you first met this contact (All My Circles)',
     groupName: 'all_my_circles_information',
     type: 'string',
     fieldType: 'text'
   },
   {
     name: 'amc_networking_notes',
-    label: 'AMC Networking Notes',
+    label: 'Networking Notes',
     description: 'Personal notes about this contact and your interactions (All My Circles)',
     groupName: 'all_my_circles_information',
     type: 'string',
     fieldType: 'textarea'
   },
   {
-    name: 'amc_last_interaction_date',
-    label: 'AMC Last Interaction Date',
-    description: 'When you last interacted with this contact (All My Circles)',
+    name: 'amc_networking_tags',
+    label: 'Networking Tags',
+    description: 'Tags to categorize this contact (All My Circles, comma-separated)',
     groupName: 'all_my_circles_information',
-    type: 'date',
-    fieldType: 'date'
-  },
-  {
-    name: 'amc_next_followup_date',
-    label: 'AMC Next Follow-up Date',
-    description: 'When you plan to follow up with this contact (All My Circles)',
-    groupName: 'all_my_circles_information',
-    type: 'date',
-    fieldType: 'date'
+    type: 'string',
+    fieldType: 'textarea'
   },
   {
     name: 'amc_total_interactions',
-    label: 'AMC Total Interactions',
+    label: 'Total Interactions',
     description: 'Number of times you have interacted with this contact (All My Circles)',
-    groupName: 'all_my_circles_information',
-    type: 'string',
-    fieldType: 'text'
-  },
-  {
-    name: 'amc_contact_id',
-    label: 'AMC Contact ID',
-    description: 'Internal All My Circles app contact identifier',
     groupName: 'all_my_circles_information',
     type: 'string',
     fieldType: 'text'
@@ -152,7 +102,9 @@ async function createCustomProperty(hubspotClient: Client, property: CustomPrope
       return null;
     } else {
       console.error(`❌ Failed to create property ${property.name}:`, error.message);
-      throw error;
+      console.error(`   Error details:`, error.body || error);
+      // Don't throw - continue with other properties
+      return null;
     }
   }
 }
