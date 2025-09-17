@@ -42,9 +42,7 @@ export async function POST(request: NextRequest) {
     const { data: newOrg, error: orgError } = await supabase
       .from('organizations')
       .insert({
-        name: `${firstName} ${lastName}'s Organization`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        name: `${firstName} ${lastName}'s Organization`
       })
       .select()
       .single();
@@ -63,9 +61,7 @@ export async function POST(request: NextRequest) {
         first_name: firstName,
         last_name: lastName,
         organization_id: newOrg.id,
-        mobile_device_id: deviceId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        mobile_device_id: deviceId
       })
       .select()
       .single();
