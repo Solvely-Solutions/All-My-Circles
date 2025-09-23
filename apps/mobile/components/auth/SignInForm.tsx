@@ -11,6 +11,7 @@ interface SignInFormProps {
 
 const SignInForm: React.FC<SignInFormProps> = ({ onSignInSuccess, onSwitchToSignUp }) => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const { signIn, isLoading } = useAuth();
 
   const handleSignIn = async () => {
@@ -24,10 +25,15 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSignInSuccess, onSwitchToSign
       return;
     }
 
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
+
     try {
       devLog('Starting user signin process', { email });
 
-      await signIn(email);
+      await signIn(email.trim(), password.trim());
 
       devLog('User signin successful');
 
