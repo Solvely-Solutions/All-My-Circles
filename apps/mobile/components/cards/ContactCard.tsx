@@ -50,10 +50,10 @@ export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact
   const cardPressGesture = Gesture.Tap()
     .onBegin(() => {
       runOnJS(triggerHaptic)('light');
-      scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
+      scale.value = withSpring(0.98);
     })
     .onFinalize((event) => {
-      scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+      scale.value = withSpring(1);
       if (event.state === 5) { // GESTURE_STATE.END
         runOnJS(onView)();
       }
@@ -64,9 +64,9 @@ export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact
     .onBegin(() => {
       runOnJS(triggerHaptic)('medium');
       starScale.value = withSequence(
-        withSpring(0.8, { damping: 15, stiffness: 400 }),
-        withSpring(1.1, { damping: 15, stiffness: 400 }),
-        withSpring(1, { damping: 15, stiffness: 300 })
+        withSpring(0.8),
+        withSpring(1.1),
+        withSpring(1)
       );
     })
     .onFinalize(() => {
@@ -78,8 +78,8 @@ export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact
     .onBegin(() => {
       runOnJS(triggerHaptic)('heavy');
       deleteScale.value = withSequence(
-        withSpring(0.9, { damping: 15, stiffness: 400 }),
-        withSpring(1, { damping: 15, stiffness: 300 })
+        withSpring(0.9),
+        withSpring(1)
       );
     })
     .onFinalize(() => {
@@ -91,8 +91,8 @@ export const ContactCard = memo<ContactCardProps>(function ContactCard({ contact
     .onBegin(() => {
       runOnJS(triggerHaptic)('medium');
       hubspotScale.value = withSequence(
-        withSpring(0.9, { damping: 15, stiffness: 400 }),
-        withSpring(1, { damping: 15, stiffness: 300 })
+        withSpring(0.9),
+        withSpring(1)
       );
     })
     .onFinalize(() => {

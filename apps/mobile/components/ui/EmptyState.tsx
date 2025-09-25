@@ -85,7 +85,7 @@ export function EmptyState({ text, type = 'default', actionText, onAction }: Emp
       accessibilityLabel={`${config.title}. ${config.subtitle}${actionText ? ` ${actionText} button available.` : ''}`}
     >
       <Animated.View
-        entering={SlideInUp.delay(300).springify()}
+        entering={SlideInUp.delay(300).duration(400)}
         style={styles.iconContainer}
       >
         {config.icon}
@@ -101,7 +101,7 @@ export function EmptyState({ text, type = 'default', actionText, onAction }: Emp
       
       {actionText && onAction && config.actionIcon && (
         <Animated.View
-          entering={SlideInUp.delay(700).springify()}
+          entering={SlideInUp.delay(700).duration(400)}
         >
           <Pressable 
             style={styles.actionButton} 

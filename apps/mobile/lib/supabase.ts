@@ -3,8 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { devLog, devError } from '../utils/logger';
 
 // Supabase configuration
-const supabaseUrl = 'https://jwhvkrjvgxpfrhxunflm.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3aHZrcmp2Z3hwZnJoeHVuZmxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY2NTI4MDMsImV4cCI6MjA1MjIyODgwM30.Y_dCjAD1HYxPCDxK9rpKMUGcVVwMxmRKfnQbFq2hW1k';
+const supabaseUrl = 'https://xoibeirouqmdesxessnt.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvaWJlaXJvdXFtZGVzeGVzc250Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NTgyNDksImV4cCI6MjA3MzAzNDI0OX0.JEZlkmC2aCQ3nMAfGsFEO0IGOVzDG7vKPiq2OtF3xqo';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');

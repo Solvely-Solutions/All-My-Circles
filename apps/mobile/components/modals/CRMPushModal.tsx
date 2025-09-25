@@ -103,7 +103,7 @@ export function CRMPushModal({ visible, contacts, onClose, onSuccess }: CRMPushM
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
       <Animated.View entering={FadeIn} style={styles.overlay}>
-        <Animated.View entering={SlideInDown.springify()} style={styles.container}>
+        <Animated.View entering={SlideInDown.duration(300)} style={styles.container}>
           <GlassCard style={styles.modal}>
             <View style={styles.header}>
               <Text style={styles.title}>Push to CRM</Text>

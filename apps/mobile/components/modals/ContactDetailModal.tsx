@@ -51,7 +51,7 @@ export function ContactDetailModal({
       <View style={styles.modalOverlay}>
         <Pressable style={styles.modalBackdrop} onPress={onClose} />
         <Animated.View 
-          entering={SlideInUp.springify().damping(15).stiffness(150)}
+          entering={SlideInUp.duration(300)}
           style={styles.detailModal}
         >
           {/* Header */}

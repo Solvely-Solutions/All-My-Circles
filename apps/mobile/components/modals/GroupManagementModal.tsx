@@ -65,7 +65,7 @@ export function GroupManagementModal({
       <View style={styles.modalOverlay}>
         <Pressable style={styles.modalBackdrop} onPress={onClose} />
         <Animated.View 
-          entering={SlideInUp.springify().damping(20).stiffness(200)}
+          entering={SlideInUp.duration(300)}
           style={styles.detailModal}
         >
           {/* Header */}

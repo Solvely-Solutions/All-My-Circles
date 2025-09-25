@@ -250,9 +250,9 @@ export function SearchSuggestions({
 
   return (
     <Animated.View
-      entering={SlideInDown.springify()}
-      exiting={SlideOutUp.springify()}
-      layout={Layout.springify()}
+      entering={SlideInDown.duration(300)}
+      exiting={SlideOutUp.duration(200)}
+      layout={Layout.duration(200)}
       style={styles.container}
     >
       <GlassCard style={styles.suggestionsCard}>
@@ -284,7 +284,7 @@ export function SearchSuggestions({
               key={suggestion.id}
               entering={FadeIn.delay(index * 50)}
               exiting={FadeOut}
-              layout={Layout.springify()}
+              layout={Layout.duration(200)}
             >
               <Pressable
                 style={styles.suggestionItem}

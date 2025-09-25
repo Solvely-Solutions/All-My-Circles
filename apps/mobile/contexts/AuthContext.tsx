@@ -214,20 +214,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const deviceId = await generateDeviceId();
 
       // Sign in with Supabase Auth
+      devLog('Attempting Supabase auth signin with:', { email });
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (authError) {
+        devError('Supabase auth signin failed:', authError);
         throw new Error(authError.message);
       }
 
       if (!authData.user) {
+        devError('Supabase auth returned no user data');
         throw new Error('Sign in failed');
       }
 
+      devLog('Supabase auth signin successful, user:', authData.user.id);
+
       // Call server signin endpoint to update device info
+      devLog('Calling server signin endpoint with:', { email, deviceId });
       const response = await fetch('https://all-my-circles-web-ltp4.vercel.app/api/mobile/auth/signin', {
         method: 'POST',
         headers: {
@@ -240,9 +246,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
+      devLog('Server signin response status:', response.status);
       const data = await response.json();
+      devLog('Server signin response data:', data);
 
       if (!response.ok) {
+        devError('Server signin failed:', data);
         throw new Error(data.error || 'Server authentication failed');
       }
 

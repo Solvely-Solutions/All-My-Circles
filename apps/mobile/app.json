@@ -2,7 +2,7 @@
   "expo": {
     "name": "All My Circles",
     "slug": "circles",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "circles",
@@ -11,7 +11,8 @@
     "ios": {
       "supportsTablet": true,
       "orientation": "default",
-      "bundleIdentifier": "com.solvely.circles"
+      "bundleIdentifier": "com.solvely.circles",
+      "buildNumber": "6"
     },
     "android": {
       "package": "com.solvely.circles",
@@ -36,7 +37,10 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-router",
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

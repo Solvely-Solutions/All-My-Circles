@@ -86,6 +86,20 @@ class CRMService {
   }
 
   /**
+   * Get HubSpot connection (if exists)
+   */
+  getHubSpotConnection(): CRMConnection | null {
+    return this.getConnections().find(conn => conn.provider === 'hubspot' && conn.isActive) || null;
+  }
+
+  /**
+   * Check if HubSpot is authenticated
+   */
+  isHubSpotAuthenticated(): boolean {
+    return this.getHubSpotConnection() !== null;
+  }
+
+  /**
    * Remove all connections (for testing)
    */
   async clearAllConnections(): Promise<void> {

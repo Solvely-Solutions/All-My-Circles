@@ -72,15 +72,13 @@ const providerInfo = {
 };
 
 export function CRMConnectModal({ visible, onClose, onSuccess }: CRMConnectModalProps) {
-  // Debug modal visibility
-  console.log('🔧 CRMConnectModal render - visible:', visible);
 
-  // Early return if not visible - MUST be before any hooks
-  if (!visible) return null;
-
+  // All hooks must be called before any early returns
   const [step, setStep] = useState<'select' | 'configure' | 'oauth' | 'test'>('select');
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [hubspotConnection, setHubspotConnection] = useState<CRMConnection | null>(null);
   const { user } = useAuth();
   
   const [formData, setFormData] = useState<FormData>({
@@ -97,10 +95,15 @@ export function CRMConnectModal({ visible, onClose, onSuccess }: CRMConnectModal
     webhookHeaders: '{}',
   });
 
-  // Initialize HubSpot auth service when component mounts
+  // Initialize HubSpot auth service and check for existing connection when component mounts
   useEffect(() => {
     if (visible && user?.deviceId) {
       hubspotAuthService.initialize(user.deviceId);
+      // Initialize CRM service and check for existing HubSpot connection
+      crmService.initialize().then(() => {
+        const existingConnection = crmService.getHubSpotConnection();
+        setHubspotConnection(existingConnection);
+      });
     }
   }, [visible, user?.deviceId]);
 
@@ -179,6 +182,7 @@ export function CRMConnectModal({ visible, onClose, onSuccess }: CRMConnectModal
 
       if (fullConnection) {
         setIsAuthenticating(false);
+        setHubspotConnection(fullConnection);
         onSuccess(fullConnection);
         Alert.alert('Success!', `Connected to HubSpot portal ${tokens.portalId}`);
         onClose();
@@ -191,6 +195,65 @@ export function CRMConnectModal({ visible, onClose, onSuccess }: CRMConnectModal
         error instanceof Error ? error.message : 'Failed to complete HubSpot connection'
       );
     }
+  };
+
+  const handleDisconnect = async () => {
+    if (!hubspotConnection) return;
+
+    Alert.alert(
+      'Disconnect HubSpot',
+      'Are you sure you want to disconnect from HubSpot? You will need to reconnect to sync contacts.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Disconnect',
+          style: 'destructive',
+          onPress: async () => {
+            setIsDisconnecting(true);
+            try {
+              devLog('Starting HubSpot disconnect process...');
+
+              // Disconnect from HubSpot auth service (backend)
+              await hubspotAuthService.disconnect();
+
+              // Remove ALL HubSpot connections from CRM service (local storage)
+              const allConnections = crmService.getConnections();
+              const hubspotConnections = allConnections.filter(conn => conn.provider === 'hubspot');
+
+              let removedCount = 0;
+              for (const connection of hubspotConnections) {
+                const removed = await crmService.removeConnection(connection.id);
+                if (removed) {
+                  removedCount++;
+                }
+              }
+
+              // Verify all connections are gone
+              const remainingConnection = crmService.getHubSpotConnection();
+
+              if (!remainingConnection) {
+                setHubspotConnection(null);
+                devLog('Successfully disconnected from HubSpot');
+                Alert.alert('Disconnected', `Successfully disconnected from HubSpot${removedCount > 1 ? ` and removed ${removedCount} connections` : ''}`);
+              } else {
+                throw new Error('Some connections could not be removed from storage');
+              }
+            } catch (error) {
+              devError('HubSpot disconnect error:', error instanceof Error ? error : new Error(String(error)));
+              Alert.alert(
+                'Disconnect Failed',
+                error instanceof Error ? error.message : 'Failed to disconnect from HubSpot. Please try again.'
+              );
+            } finally {
+              setIsDisconnecting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleTest = async () => {
@@ -228,27 +291,82 @@ export function CRMConnectModal({ visible, onClose, onSuccess }: CRMConnectModal
   };
 
   const renderProviderSelection = () => (
-    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-      <Text style={styles.title}>Connect Your CRM</Text>
-      <Text style={styles.subtitle}>
-        Choose a CRM provider to start syncing your professional contacts
-      </Text>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>HubSpot CRM</Text>
+        <Text style={styles.subtitle}>
+          Connect your HubSpot account to sync your professional contacts
+        </Text>
 
-      {(Object.keys(providerInfo) as CRMProvider[]).map(provider => (
-        <Pressable
-          key={provider}
-          style={styles.providerCard}
-          onPress={() => handleProviderSelect(provider)}
-        >
-          <View style={styles.providerInfo}>
-            <Text style={styles.providerName}>{providerInfo[provider].name}</Text>
-            <Text style={styles.providerDescription}>{providerInfo[provider].description}</Text>
+      {/* HubSpot Connection Card */}
+      <Pressable
+        style={[
+          styles.providerCard,
+          hubspotConnection && styles.providerCardAuthenticated
+        ]}
+        onPress={() => hubspotConnection ? null : handleProviderSelect('hubspot')}
+        disabled={!!hubspotConnection}
+      >
+        <View style={styles.providerInfo}>
+          <View style={styles.providerHeader}>
+            <Text style={styles.providerName}>HubSpot</Text>
+            {hubspotConnection && (
+              <View style={styles.authenticatedBadge}>
+                <Check size={14} color="#10b981" />
+                <Text style={styles.authenticatedText}>Connected</Text>
+              </View>
+            )}
           </View>
-          <View style={styles.providerIcon}>
+          <Text style={styles.providerDescription}>
+            {hubspotConnection
+              ? `Connected to portal ${hubspotConnection.credentials.hubspotPortalId || 'Unknown'}`
+              : 'Connect with HubSpot CRM to sync contacts and manage your sales pipeline.'
+            }
+          </Text>
+          {hubspotConnection && (
+            <Text style={styles.connectionDetails}>
+              Connected as: {hubspotConnection.name}
+            </Text>
+          )}
+        </View>
+        <View style={styles.providerIcon}>
+          {hubspotConnection ? (
+            <Check size={20} color="#10b981" />
+          ) : (
             <ExternalLink size={20} color="rgba(255,255,255,0.6)" />
-          </View>
-        </Pressable>
-      ))}
+          )}
+        </View>
+      </Pressable>
+
+      {hubspotConnection && (
+        <View style={styles.authenticatedActions}>
+          <Pressable
+            style={[styles.secondaryButton, isDisconnecting && styles.buttonDisabled]}
+            onPress={handleDisconnect}
+            disabled={isDisconnecting}
+          >
+            {isDisconnecting ? (
+              <View style={styles.loadingContainer}>
+                <Loader2 size={14} color="rgba(255,255,255,0.8)" style={{ marginRight: 8 }} />
+                <Text style={styles.secondaryButtonText}>Disconnecting...</Text>
+              </View>
+            ) : (
+              <Text style={styles.secondaryButtonText}>Disconnect</Text>
+            )}
+          </Pressable>
+          <Pressable
+            style={[styles.primaryButton, isDisconnecting && styles.buttonDisabled]}
+            onPress={() => {
+              if (hubspotConnection) {
+                onSuccess(hubspotConnection);
+                onClose();
+              }
+            }}
+            disabled={isDisconnecting}
+          >
+            <Text style={styles.primaryButtonText}>Use Connection</Text>
+          </Pressable>
+        </View>
+      )}
     </ScrollView>
   );
 
@@ -420,7 +538,7 @@ export function CRMConnectModal({ visible, onClose, onSuccess }: CRMConnectModal
         style={styles.backdrop} 
         onPress={onClose}
       />
-      <Animated.View entering={SlideInDown.springify()} style={styles.container}>
+      <Animated.View entering={SlideInDown.duration(300)} style={styles.container}>
         <GlassCard style={styles.modal}>
           <View style={styles.header}>
             <Pressable onPress={onClose} style={styles.closeButton}>
@@ -517,6 +635,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
     marginBottom: 12,
   },
+  providerCardAuthenticated: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
   providerInfo: {
     flex: 1,
   },
@@ -533,6 +655,37 @@ const styles = StyleSheet.create({
   },
   providerIcon: {
     marginLeft: 12,
+  },
+  providerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  authenticatedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  authenticatedText: {
+    color: '#10b981',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  connectionDetails: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  authenticatedActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
   },
   helpLink: {
     flexDirection: 'row',

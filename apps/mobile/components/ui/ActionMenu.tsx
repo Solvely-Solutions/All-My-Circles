@@ -49,10 +49,10 @@ const AnimatedMenuItem = ({ item, index }: AnimatedMenuItemProps) => {
   const pressGesture = Gesture.Tap()
     .onBegin(() => {
       runOnJS(triggerHaptic)();
-      scale.value = withSpring(0.95, { damping: 15, stiffness: 400 });
+      scale.value = withSpring(0.95);
     })
     .onFinalize(() => {
-      scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+      scale.value = withSpring(1);
       runOnJS(item.onPress)();
     });
 
@@ -63,7 +63,7 @@ const AnimatedMenuItem = ({ item, index }: AnimatedMenuItemProps) => {
   return (
     <GestureDetector gesture={pressGesture}>
       <Animated.View
-        entering={SlideInUp.delay(index * 50).springify()}
+        entering={SlideInUp.delay(index * 50).duration(300)}
         exiting={FadeOut}
         style={[animatedStyle]}
       >
@@ -187,7 +187,7 @@ export function ActionMenu({
       </Pressable>
       
       <Animated.View
-        entering={SlideInUp.duration(300).springify()}
+        entering={SlideInUp.duration(300)}
         exiting={SlideOutUp.duration(200)}
         style={styles.menuContainer}
       >
